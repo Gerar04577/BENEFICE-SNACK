@@ -444,3 +444,27 @@ select {
   font-size: 13px;
   letter-spacing: 0.02em;
 }
+
+/* ============================================================
+   Graphiques (SVG natif, sans dépendance externe)
+   ============================================================ */
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.chart-legend {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+.chart-legend .dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.chart-legend .dot.complet { background: var(--green); }
+.chart-legend .dot.nespresso { background: var(--gold); }

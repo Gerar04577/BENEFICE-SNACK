@@ -96,6 +96,26 @@ Si le montant payé est <b>inférieur à 500 €</b> (ex. un petit ustensile, un
 <br><br>
 ⚠️ Les durées proposées sont "communément admises" mais pas gravées dans le marbre — demandez confirmation à votre comptable, qui peut les ajuster selon le bien réel.`
   },
+  "cumuls": {
+    titre: "Comment lire les cumuls",
+    corps: `Cet écran regroupe les bénéfices déjà saisis, à trois niveaux :
+<br><br>
+<b>Par jour</b> : les 30 derniers jours saisis, avec les deux comptabilités côte à côte (Mode complet et Mode Nespresso) — <b>toujours séparées</b>, jamais additionnées entre elles.<br>
+<b>Par mois calendaire</b> : le total du mois, avec une <b>projection</b> de ce que ça donnerait en fin de mois si le rythme actuel continue (calculée sur les jours calendrier, pas seulement les jours travaillés).<br>
+<b>Par année fiscale</b> : le total de l'année (1er janvier au 31 décembre), avec une projection de fin d'année — disponible seulement une fois janvier terminé, pour avoir un minimum de recul.
+<br><br>
+⚠️ Les projections sont des estimations basées sur la tendance actuelle, pas une garantie — un mois d'été et un mois d'hiver peuvent être très différents.`
+  },
+  "analyse-produits": {
+    titre: "Comment lire l'analyse des produits",
+    corps: `Chaque mois, l'app regarde les ventes du mois précédent (une fois qu'il est terminé) et identifie :<br>
+- le produit qui rapporte le plus (à mettre en avant, à pousser à la vente)<br>
+- le produit le moins rentable, voire qui ne rapporte rien (à surveiller ou à retirer de la carte)
+<br><br>
+Le classement se base sur la marge par minute de préparation quand le temps est renseigné (sinon la marge par vente) — un produit rapide et peu cher peut être plus rentable qu'un plat long à préparer, même si sa marge en euros semble plus petite.
+<br><br>
+Cette analyse s'affiche automatiquement une fois par mois à l'ouverture de l'app, et reste toujours consultable ici.`
+  },
   "nespresso": {
     titre: "Qu'est-ce que le mode Nespresso ?",
     corps: `C'est un 2ᵉ mode d'affichage, en plus du calcul complet habituel — un bouton pour basculer de l'un à l'autre, en haut de l'app.
@@ -288,6 +308,234 @@ function computeDayBeneficeAvantImpot(entry, settings, products, ingredients) {
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function eur(n) {
   return (Math.round((n || 0) * 100) / 100).toLocaleString("fr-BE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+}
+
+/* ============================================================
+   Cumuls (jour / mois / année fiscale) — deux comptabilités
+   toujours calculées séparément, jamais mélangées.
+   ============================================================ */
+function joursDansMois(annee, mois1a12) {
+  return new Date(annee, mois1a12, 0).getDate(); // mois1a12 : 1=janvier
+}
+function joursDansAnnee(annee) {
+  return (new Date(annee, 1, 29).getMonth() === 1) ? 366 : 365; // test année bissextile
+}
+function jourDeLAnnee(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const debut = new Date(d.getFullYear(), 0, 1);
+  return Math.floor((d - debut) / 86400000) + 1;
+}
+
+// Calcule, pour chaque jour saisi, le bénéfice dans les deux comptabilités.
+function computeAllDaily(products, ingredients, settings) {
+  const entries = loadEntries().slice().sort((a, b) => a.date.localeCompare(b.date));
+  return entries.map((e) => ({
+    date: e.date,
+    complet: computeDay(e, settings, products, ingredients).beneficeNet,
+    nespresso: computeDayNespresso(e, products, ingredients).beneficeNespresso
+  }));
+}
+
+// Regroupe une liste { date, complet, nespresso } par mois ("YYYY-MM") ou par année ("YYYY").
+function regrouperPar(daily, longueurCle) {
+  const map = new Map();
+  daily.forEach((d) => {
+    const cle = d.date.slice(0, longueurCle);
+    if (!map.has(cle)) map.set(cle, { cle, complet: 0, nespresso: 0, dates: [] });
+    const g = map.get(cle);
+    g.complet += d.complet;
+    g.nespresso += d.nespresso;
+    g.dates.push(d.date);
+  });
+  return Array.from(map.values()).sort((a, b) => b.cle.localeCompare(a.cle));
+}
+
+// Projection au prorata des jours calendrier écoulés (pas seulement les jours saisis).
+function projeter(cumul, joursEcoules, joursTotal) {
+  if (joursEcoules <= 0) return null;
+  return (cumul / joursEcoules) * joursTotal;
+}
+
+function buildCumuls(products, ingredients, settings) {
+  const daily = computeAllDaily(products, ingredients, settings);
+  const mois = regrouperPar(daily, 7);   // "YYYY-MM"
+  const annees = regrouperPar(daily, 4); // "YYYY"
+  const today = todayISO();
+  const [anneeAuj, moisAuj] = [parseInt(today.slice(0, 4), 10), parseInt(today.slice(5, 7), 10)];
+
+  const moisAvecProjection = mois.map((m) => {
+    const [a, mo] = m.cle.split("-").map((x) => parseInt(x, 10));
+    const total = joursDansMois(a, mo);
+    const estMoisEnCours = a === anneeAuj && mo === moisAuj;
+    const dernierJourDonnee = Math.max(...m.dates.map((d) => parseInt(d.slice(8, 10), 10)));
+    const ecoule = estMoisEnCours ? Math.max(parseInt(today.slice(8, 10), 10), dernierJourDonnee) : total;
+    return {
+      ...m,
+      joursEcoules: ecoule,
+      joursTotal: total,
+      estComplet: !estMoisEnCours,
+      projectionComplet: estMoisEnCours ? projeter(m.complet, ecoule, total) : null,
+      projectionNespresso: estMoisEnCours ? projeter(m.nespresso, ecoule, total) : null
+    };
+  });
+
+  const anneesAvecProjection = annees.map((y) => {
+    const a = parseInt(y.cle, 10);
+    const total = joursDansAnnee(a);
+    const estAnneeEnCours = a === anneeAuj;
+    const dernierJourDonnee = Math.max(...y.dates.map((d) => jourDeLAnnee(d)));
+    const ecoule = estAnneeEnCours ? Math.max(jourDeLAnnee(today), dernierJourDonnee) : total;
+    // Projection annuelle uniquement disponible une fois le premier mois calendaire écoulé.
+    const premierMoisEcoule = estAnneeEnCours ? moisAuj > 1 : true;
+    return {
+      ...y,
+      joursEcoules: ecoule,
+      joursTotal: total,
+      estComplete: !estAnneeEnCours,
+      projectionDisponible: estAnneeEnCours && premierMoisEcoule,
+      projectionComplet: (estAnneeEnCours && premierMoisEcoule) ? projeter(y.complet, ecoule, total) : null,
+      projectionNespresso: (estAnneeEnCours && premierMoisEcoule) ? projeter(y.nespresso, ecoule, total) : null
+    };
+  });
+
+  return { daily: daily.slice().reverse(), mois: moisAvecProjection, annees: anneesAvecProjection };
+}
+
+/* ============================================================
+   Analyse mensuelle des produits (mois calendaire précédent complet)
+   ============================================================ */
+function moisPrecedentCle(today) {
+  const d = new Date(today + "T00:00:00");
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return d.toISOString().slice(0, 7);
+}
+
+// Agrège les lignes de vente (marge, marge/min) de toutes les entrées d'un mois donné ("YYYY-MM").
+function analyseMensuelleProduits(moisCle, settings, products, ingredients) {
+  const entries = loadEntries().filter((e) => e.date.startsWith(moisCle));
+  if (entries.length === 0) return null;
+
+  const parProduit = new Map();
+  entries.forEach((e) => {
+    const r = computeDay(e, settings, products, ingredients);
+    r.lignes.forEach((l) => {
+      if (!parProduit.has(l.productId)) parProduit.set(l.productId, { nom: l.nom, margeTotale: 0, qteTotale: 0, tempsTotalMin: 0 });
+      const p = parProduit.get(l.productId);
+      p.margeTotale += l.marge;
+      p.qteTotale += l.qteTotal;
+      if (l.tempsPreparationMin) p.tempsTotalMin += l.tempsPreparationMin * l.qteTotal;
+    });
+  });
+
+  const liste = Array.from(parProduit.values()).map((p) => ({
+    ...p,
+    margeParMinute: p.tempsTotalMin > 0 ? p.margeTotale / p.tempsTotalMin : null,
+    margeParVente: p.qteTotale > 0 ? p.margeTotale / p.qteTotale : 0
+  }));
+  if (liste.length === 0) return null;
+
+  liste.sort((a, b) => (b.margeParMinute != null ? b.margeParMinute : b.margeParVente) - (a.margeParMinute != null ? a.margeParMinute : a.margeParVente));
+  const meilleur = liste[0];
+  const pire = liste[liste.length - 1];
+
+  let message = `Analyse du mois de ${moisCle} : `;
+  if (liste.length > 1 && meilleur !== pire) {
+    message += `"${meilleur.nom}" est le produit le plus rentable (${eur(meilleur.margeTotale)} de marge sur le mois${meilleur.margeParMinute != null ? `, ${eur(meilleur.margeParMinute)}/min` : ""}) — à mettre en avant. `;
+    if (pire.margeParVente <= 0) {
+      message += `"${pire.nom}" ne rapporte rien ou fait perdre de l'argent (${eur(pire.margeTotale)} sur le mois) — à revoir ou retirer de la carte.`;
+    } else {
+      message += `"${pire.nom}" est le moins rentable actuellement (${eur(pire.margeTotale)} sur le mois) — à surveiller.`;
+    }
+  } else {
+    message += `"${meilleur.nom}" est votre seul produit vendu ce mois-ci (${eur(meilleur.margeTotale)} de marge).`;
+  }
+  return { moisCle, liste, message };
+}
+
+function cleAlerteVue(moisCle) { return "benefice-snack:alerteVue:" + moisCle; }
+
+/* ============================================================
+   Graphiques (SVG natif, aucune bibliothèque externe requise)
+   ============================================================ */
+const CHART_GREEN = "#3B5D42", CHART_GOLD = "#B8892B", CHART_RUST = "#A63D2F", CHART_LINE = "#C9BFA9";
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function svgEl(tag, attrs) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function clearSvg(id) {
+  const svg = document.getElementById(id);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  return svg;
+}
+
+// Courbe à 2 séries (Mode complet / Mode Nespresso).
+function drawLineChart(id, labels, serieA, serieB) {
+  const svg = clearSvg(id);
+  if (labels.length === 0) return;
+  const W = 340, H = 160, padL = 6, padR = 10, padB = 20, padT = 10;
+  const all = [...serieA, ...serieB, 0];
+  const max = Math.max(...all), min = Math.min(...all);
+  const span = (max - min) || 1;
+  const x = (i) => labels.length > 1 ? padL + (i / (labels.length - 1)) * (W - padL - padR) : padL;
+  const y = (v) => padT + (1 - (v - min) / span) * (H - padT - padB);
+
+  svg.appendChild(svgEl("line", { x1: padL, y1: y(0), x2: W - padR, y2: y(0), stroke: CHART_LINE, "stroke-dasharray": "3,3" }));
+  [[serieA, CHART_GREEN], [serieB, CHART_GOLD]].forEach(([serie, color]) => {
+    if (serie.length === 0) return;
+    const d = "M " + serie.map((v, i) => `${x(i)},${y(v)}`).join(" L ");
+    svg.appendChild(svgEl("path", { d, fill: "none", stroke: color, "stroke-width": 2 }));
+  });
+  svg.appendChild(Object.assign(svgEl("text", { x: padL, y: H - 4, "font-size": 9, fill: "#5A5147" }), { textContent: labels[0] }));
+  if (labels.length > 1) {
+    svg.appendChild(Object.assign(svgEl("text", { x: W - padR - 18, y: H - 4, "font-size": 9, fill: "#5A5147" }), { textContent: labels[labels.length - 1] }));
+  }
+}
+
+// Barres groupées à 2 séries (Mode complet / Mode Nespresso), valeurs pouvant être négatives.
+function drawGroupedBarChart(id, labels, serieA, serieB) {
+  const svg = clearSvg(id);
+  if (labels.length === 0) return;
+  const W = 340, H = 160, padB = 20, padT = 10;
+  const maxAbs = Math.max(...serieA.map(Math.abs), ...serieB.map(Math.abs), 1);
+  const zeroY = H - padB;
+  const scale = (H - padT - padB) / maxAbs;
+  const groupW = W / labels.length;
+  const barW = groupW * 0.3;
+
+  labels.forEach((label, i) => {
+    const gx = i * groupW + groupW * 0.15;
+    [[serieA[i], CHART_GREEN, gx], [serieB[i], CHART_GOLD, gx + barW + 3]].forEach(([val, color, bx]) => {
+      const h = Math.abs(val) * scale;
+      const barY = val >= 0 ? zeroY - h : zeroY;
+      svg.appendChild(svgEl("rect", { x: bx, y: barY, width: barW, height: Math.max(h, 1), fill: color }));
+    });
+    svg.appendChild(Object.assign(svgEl("text", { x: gx, y: H - 5, "font-size": 9, fill: "#5A5147" }), { textContent: label }));
+  });
+}
+
+// Barres horizontales de classement (marge par produit, triée décroissante).
+function drawHorizontalBarChart(id, labels, values) {
+  const svg = clearSvg(id);
+  if (labels.length === 0) return;
+  const W = 340, H = Math.max(160, labels.length * 30), padL = 92, padR = 44;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const maxAbs = Math.max(...values.map(Math.abs), 1);
+  const rowH = H / labels.length;
+
+  labels.forEach((label, i) => {
+    const rowY = i * rowH + rowH * 0.2;
+    const w = (Math.abs(values[i]) / maxAbs) * (W - padL - padR);
+    const color = values[i] <= 0 ? CHART_RUST : (i === 0 ? CHART_GREEN : CHART_GOLD);
+    const texteLabel = label.length > 16 ? label.slice(0, 15) + "…" : label;
+    svg.appendChild(Object.assign(svgEl("text", { x: 0, y: rowY + rowH * 0.35, "font-size": 10, fill: "#241F1A" }), { textContent: texteLabel }));
+    svg.appendChild(svgEl("rect", { x: padL, y: rowY, width: Math.max(w, 1), height: rowH * 0.5, fill: color }));
+    svg.appendChild(Object.assign(svgEl("text", { x: padL + w + 4, y: rowY + rowH * 0.35, "font-size": 9, fill: "#5A5147" }), { textContent: eur(values[i]) }));
+  });
 }
 
 /* ============================================================
@@ -500,6 +748,7 @@ function showScreen(name) {
   if (name === "dashboard") renderDashboard();
   if (name === "produits") renderProduitsScreen();
   if (name === "investissements") renderInvestissementsScreen();
+  if (name === "cumuls") renderCumulsScreen();
   if (name === "settings") renderSettingsForm();
 }
 
@@ -974,6 +1223,108 @@ function hideHelp() {
 }
 
 /* ============================================================
+   Écran Cumuls (jour / mois / année, deux comptabilités séparées)
+   ============================================================ */
+function renderCumulsScreen() {
+  const settings = loadSettings();
+  const products = loadProducts();
+  const ingredients = loadIngredients();
+  const c = buildCumuls(products, ingredients, settings);
+
+  // Par jour (les 30 derniers, les deux comptabilités côte à côte)
+  const jourEl = document.getElementById("cumuls-jour-list");
+  if (c.daily.length === 0) {
+    jourEl.innerHTML = `<div class="empty-state">Aucune journée saisie.</div>`;
+  } else {
+    jourEl.innerHTML = c.daily.slice(0, 30).map((d) => `
+      <div class="detail-line">
+        <span>${d.date}</span>
+        <span>Complet : ${eur(d.complet)} &nbsp;·&nbsp; Nespresso : ${eur(d.nespresso)}</span>
+      </div>`).join("");
+  }
+
+  // Par mois
+  const moisEl = document.getElementById("cumuls-mois-list");
+  if (c.mois.length === 0) {
+    moisEl.innerHTML = `<div class="empty-state">Aucune donnée.</div>`;
+  } else {
+    moisEl.innerHTML = c.mois.map((m) => `
+      <div class="detail-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
+        <span style="font-weight:600;">${m.cle} ${m.estComplet ? "" : "(en cours — " + m.joursEcoules + "/" + m.joursTotal + " jours)"}</span>
+        <span>Complet : ${eur(m.complet)}${m.projectionComplet != null ? ` (projection fin de mois : ${eur(m.projectionComplet)})` : ""}</span>
+        <span>Nespresso : ${eur(m.nespresso)}${m.projectionNespresso != null ? ` (projection fin de mois : ${eur(m.projectionNespresso)})` : ""}</span>
+      </div>`).join("");
+  }
+
+  // Par année fiscale
+  const anneeEl = document.getElementById("cumuls-annee-list");
+  if (c.annees.length === 0) {
+    anneeEl.innerHTML = `<div class="empty-state">Aucune donnée.</div>`;
+  } else {
+    anneeEl.innerHTML = c.annees.map((y) => `
+      <div class="detail-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
+        <span style="font-weight:600;">${y.cle} ${y.estComplete ? "" : "(en cours — jour " + y.joursEcoules + "/" + y.joursTotal + ")"}</span>
+        <span>Complet : ${eur(y.complet)}${y.projectionComplet != null ? ` (projection fin d'année : ${eur(y.projectionComplet)})` : ""}</span>
+        <span>Nespresso : ${eur(y.nespresso)}${y.projectionNespresso != null ? ` (projection fin d'année : ${eur(y.projectionNespresso)})` : ""}</span>
+        ${(!y.estComplete && !y.projectionDisponible) ? '<span class="field-note">Projection disponible dès que janvier sera terminé.</span>' : ""}
+      </div>`).join("");
+  }
+
+  // Graphique jour (les 30 derniers, ordre chronologique croissant pour la courbe)
+  const daily30 = c.daily.slice(0, 30).slice().reverse();
+  drawLineChart("chart-jour", daily30.map((d) => d.date.slice(8, 10) + "/" + d.date.slice(5, 7)), daily30.map((d) => d.complet), daily30.map((d) => d.nespresso));
+
+  // Graphique mois (ordre chronologique croissant pour les barres)
+  const moisChrono = c.mois.slice().reverse();
+  drawGroupedBarChart("chart-mois", moisChrono.map((m) => m.cle.slice(5, 7) + "/" + m.cle.slice(2, 4)), moisChrono.map((m) => m.complet), moisChrono.map((m) => m.nespresso));
+
+  // Graphique année (ordre chronologique croissant)
+  const anneesChrono = c.annees.slice().reverse();
+  drawGroupedBarChart("chart-annee", anneesChrono.map((y) => y.cle), anneesChrono.map((y) => y.complet), anneesChrono.map((y) => y.nespresso));
+
+  renderAnalyseMensuelle(settings, products, ingredients, false);
+}
+
+function renderAnalyseMensuelle(settings, products, ingredients, autoPopup) {
+  const moisCle = moisPrecedentCle(todayISO());
+  const analyse = analyseMensuelleProduits(moisCle, settings, products, ingredients);
+  const el = document.getElementById("analyse-mensuelle-box");
+
+  if (!analyse) {
+    el.innerHTML = `<div class="empty-state">Pas encore assez de données pour le mois précédent (${moisCle}).</div>`;
+    clearSvg("chart-produits");
+    return;
+  }
+
+  const listeTriee = analyse.liste.slice().sort((a, b) => b.margeTotale - a.margeTotale);
+  const lignesHtml = listeTriee
+    .map((p, i) => `
+      <div class="detail-line">
+        <span>${i + 1}. ${p.nom}</span>
+        <span>${eur(p.margeTotale)}${p.margeParMinute != null ? ` · ${eur(p.margeParMinute)}/min` : ""}</span>
+      </div>`).join("");
+
+  drawHorizontalBarChart("chart-produits", listeTriee.map((p) => p.nom), listeTriee.map((p) => Math.round(p.margeTotale * 100) / 100));
+
+  el.innerHTML = `
+    <div class="field-note">${analyse.message}</div>
+    <div class="section-gap"></div>
+    ${lignesHtml}
+  `;
+
+  if (autoPopup) {
+    const vueKey = cleAlerteVue(analyse.moisCle);
+    if (localStorage.getItem(vueKey) !== "1") {
+      document.getElementById("help-modal-title").textContent = "Analyse du mois écoulé";
+      document.getElementById("help-modal-body").innerHTML = `<div>${analyse.message}</div><div class="section-gap"></div>${lignesHtml}`;
+      document.getElementById("help-modal").style.display = "flex";
+      localStorage.setItem(vueKey, "1");
+    }
+  }
+}
+
+
+/* ============================================================
    Écran Paramètres
    ============================================================ */
 function renderSettingsForm() {
@@ -1158,13 +1509,19 @@ document.addEventListener("DOMContentLoaded", () => {
   updateNespressoToggleUI();
 
   document.getElementById("nespresso-toggle").addEventListener("click", () => {
-    setModeNespresso(!isModeNespresso());
+    const activerMaintenant = !isModeNespresso();
+    const message = activerMaintenant
+      ? "⚠️ Vous allez ACTIVER le Mode Nespresso.\n\nDans ce mode, le bénéfice affiché ne retire QUE le coût d'achat des produits — aucune TVA, charge fixe, amortissement, cotisation ou impôt n'est déduit. Le chiffre sera plus élevé que le vrai bénéfice net.\n\nConfirmez-vous l'activation ?"
+      : "Vous allez DÉSACTIVER le Mode Nespresso et revenir au calcul complet (avec charges, impôt, etc.).\n\nConfirmez-vous ?";
+    if (!window.confirm(message)) return;
+    setModeNespresso(activerMaintenant);
     updateNespressoToggleUI();
     showScreen(currentScreenName());
   });
 
   document.getElementById("tab-saisie").addEventListener("click", () => showScreen("saisie"));
   document.getElementById("tab-dashboard").addEventListener("click", () => showScreen("dashboard"));
+  document.getElementById("tab-cumuls").addEventListener("click", () => showScreen("cumuls"));
   document.getElementById("tab-produits").addEventListener("click", () => showScreen("produits"));
   document.getElementById("tab-investissements").addEventListener("click", () => showScreen("investissements"));
   document.getElementById("tab-settings").addEventListener("click", () => showScreen("settings"));
@@ -1195,6 +1552,9 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("recette-add-btn").addEventListener("click", handleAddRecetteLine);
 
   initBackgroundSyncTriggers();
+
+  // Alerte mensuelle automatique (une seule fois par mois écoulé, silencieuse si déjà vue).
+  renderAnalyseMensuelle(loadSettings(), loadProducts(), loadIngredients(), true);
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});

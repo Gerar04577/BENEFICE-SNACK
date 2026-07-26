@@ -61,6 +61,46 @@
     </div>
   </section>
 
+  <!-- ================= ÉCRAN : CUMULS ================= -->
+  <section id="screen-cumuls" class="screen">
+    <div class="ticket">
+      <div class="ticket-title-row">
+        <div class="ticket-title">Par jour (30 derniers, les 2 comptabilités)</div>
+        <button type="button" class="help-btn" data-help="cumuls">?</button>
+      </div>
+      <svg id="chart-jour" class="chart-svg" viewBox="0 0 340 160"></svg>
+      <div class="chart-legend"><span class="dot complet"></span>Mode complet &nbsp;&nbsp;<span class="dot nespresso"></span>Mode Nespresso</div>
+      <div class="section-gap"></div>
+      <div id="cumuls-jour-list"></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-title">Par mois calendaire</div>
+      <svg id="chart-mois" class="chart-svg" viewBox="0 0 340 160"></svg>
+      <div class="chart-legend"><span class="dot complet"></span>Mode complet &nbsp;&nbsp;<span class="dot nespresso"></span>Mode Nespresso</div>
+      <div class="section-gap"></div>
+      <div id="cumuls-mois-list"></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-title">Par année fiscale</div>
+      <svg id="chart-annee" class="chart-svg" viewBox="0 0 340 160"></svg>
+      <div class="chart-legend"><span class="dot complet"></span>Mode complet &nbsp;&nbsp;<span class="dot nespresso"></span>Mode Nespresso</div>
+      <div class="section-gap"></div>
+      <div id="cumuls-annee-list"></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-title-row">
+        <div class="ticket-title">Analyse du mois écoulé — produits</div>
+        <button type="button" class="help-btn" data-help="analyse-produits">?</button>
+      </div>
+      <svg id="chart-produits" class="chart-svg" viewBox="0 0 340 160"></svg>
+      <div class="section-gap"></div>
+      <div id="analyse-mensuelle-box"></div>
+    </div>
+  </section>
+
   <!-- ================= ÉCRAN 3 : PRODUITS ================= -->
   <section id="screen-produits" class="screen">
 
@@ -291,6 +331,7 @@
 <nav class="tabbar">
   <button id="tab-saisie" type="button">Saisie</button>
   <button id="tab-dashboard" type="button">Résultats</button>
+  <button id="tab-cumuls" type="button">Cumuls</button>
   <button id="tab-produits" type="button">Produits</button>
   <button id="tab-investissements" type="button">Invest.</button>
   <button id="tab-settings" type="button">Paramètres</button>
