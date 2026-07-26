@@ -1,0 +1,337 @@
+@import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Work+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --paper: #F7F3E8;
+  --paper-dark: #ECE5D3;
+  --ink: #241F1A;
+  --ink-soft: #5A5147;
+  --line: #C9BFA9;
+  --green: #3B5D42;
+  --green-soft: #E4EBE1;
+  --rust: #A63D2F;
+  --rust-soft: #F3E0DB;
+  --gold: #B8892B;
+  --radius: 2px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper-dark);
+  color: var(--ink);
+  font-family: 'Work Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.app-header {
+  padding: 18px 20px 10px;
+  text-align: center;
+}
+
+.app-header .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.app-header h1 {
+  font-family: 'Special Elite', monospace;
+  font-size: 22px;
+  margin: 4px 0 0;
+  letter-spacing: 0.02em;
+}
+
+main {
+  flex: 1;
+  padding: 4px 16px 96px;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.screen { display: none; }
+.screen.active { display: block; animation: fade-in 0.15s ease-out; }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- La carte "ticket" avec bord perforé --- */
+.ticket {
+  background: var(--paper);
+  position: relative;
+  padding: 20px 18px 26px;
+  margin: 14px 0 24px;
+  box-shadow: 0 2px 0 rgba(36, 31, 26, 0.06);
+  clip-path: polygon(
+    0% 0%, 100% 0%, 100% 96%,
+    96% 100%, 92% 96%, 88% 100%, 84% 96%, 80% 100%, 76% 96%, 72% 100%,
+    68% 96%, 64% 100%, 60% 96%, 56% 100%, 52% 96%, 48% 100%, 44% 96%,
+    40% 100%, 36% 96%, 32% 100%, 28% 96%, 24% 100%, 20% 96%, 16% 100%,
+    12% 96%, 8% 100%, 4% 96%, 0% 100%
+  );
+}
+
+.ticket-title {
+  font-family: 'Special Elite', monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 14px 0 5px;
+}
+
+label .hint {
+  font-size: 11px;
+  color: var(--gold);
+  font-weight: 500;
+}
+
+input[type="number"], input[type="text"], input[type="date"] {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-family: 'Work Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+}
+
+input:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+
+.row-split { display: flex; gap: 10px; }
+.row-split > div { flex: 1; }
+
+button.primary {
+  width: 100%;
+  margin-top: 20px;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+}
+
+button.primary:active { opacity: 0.85; }
+
+button.secondary {
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* --- Le tampon "bénéfice net" --- */
+.stamp-wrap { text-align: center; margin: 22px 0 8px; }
+
+.stamp {
+  display: inline-block;
+  padding: 14px 22px;
+  border: 3px double var(--green);
+  color: var(--green);
+  transform: rotate(-3deg);
+  font-family: 'Special Elite', monospace;
+}
+
+.stamp.negative { border-color: var(--rust); color: var(--rust); }
+
+.stamp .label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.stamp .amount {
+  display: block;
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 5px 0;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-line span:last-child { color: var(--ink); }
+
+/* --- Tableau de bord --- */
+.summary-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.summary-card:last-child { border-bottom: none; }
+
+.summary-card .day {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.summary-card .value {
+  font-family: 'Special Elite', monospace;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.value.positive { color: var(--green); }
+.value.negative { color: var(--rust); }
+
+.bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.bar-row .bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--paper-dark);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bar-row .bar-fill { height: 100%; background: var(--green); }
+.bar-row .bar-fill.negative { background: var(--rust); }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 10px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.04em;
+}
+.badge.ok { background: var(--green-soft); color: var(--green); }
+.badge.pending { background: var(--rust-soft); color: var(--rust); }
+
+/* --- Barre d'onglets basse --- */
+nav.tabbar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+nav.tabbar button {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 12px 0 10px;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+nav.tabbar button.active { color: var(--green); font-weight: 600; }
+
+.field-note {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: -2px;
+  margin-bottom: 10px;
+}
+
+.section-gap { margin-top: 26px; }
+
+/* --- Saisie par produit (compteurs +/-) --- */
+.product-row {
+  padding: 12px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.product-row:first-child { padding-top: 0; }
+.product-row:last-child { border-bottom: none; }
+
+.product-row-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.counter-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.counter-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.counter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.counter button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--green);
+  background: #fff;
+  color: var(--green);
+  font-size: 18px;
+  line-height: 1;
+}
+.counter button:active { background: var(--green-soft); }
+
+.counter .ctr-value {
+  min-width: 24px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-family: 'Work Sans', sans-serif;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+}

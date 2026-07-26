@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bénéfice du Jour</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#3B5D42">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="eyebrow">Snack &amp; petite restauration</div>
+  <h1>Bénéfice du Jour</h1>
+</header>
+
+<main>
+
+  <!-- ================= ÉCRAN 1 : SAISIE ================= -->
+  <section id="screen-saisie" class="screen">
+    <form id="save-form" class="ticket">
+      <div class="ticket-title">Saisie du jour</div>
+      <label for="input-date">Date</label>
+      <input type="date" id="input-date">
+
+      <div id="produits-saisie-list"></div>
+
+      <div class="section-gap"></div>
+      <label for="input-heures-etudiants">Heures étudiant(s) travaillées aujourd'hui</label>
+      <input type="number" step="0.5" min="0" inputmode="decimal" id="input-heures-etudiants" placeholder="0">
+
+      <div class="row-split">
+        <div>
+          <label for="input-achats">Achats matières (réel, €)</label>
+          <input type="number" step="0.01" min="0" inputmode="decimal" id="input-achats" placeholder="0,00">
+        </div>
+        <div>
+          <label for="input-charges-except">Charges exceptionnelles (€)</label>
+          <input type="number" step="0.01" min="0" inputmode="decimal" id="input-charges-except" placeholder="0,00">
+        </div>
+      </div>
+
+      <button type="submit" class="primary">Enregistrer la journée</button>
+    </form>
+
+    <div id="result-box" class="ticket" style="display:none"></div>
+  </section>
+
+  <!-- ================= ÉCRAN 2 : RÉSULTATS ================= -->
+  <section id="screen-dashboard" class="screen">
+    <div class="ticket">
+      <div class="ticket-title">Historique</div>
+      <div id="dashboard-month-total" style="font-weight:600; margin-bottom:10px;"></div>
+      <div id="dashboard-list"></div>
+    </div>
+  </section>
+
+  <!-- ================= ÉCRAN 3 : PRODUITS ================= -->
+  <section id="screen-produits" class="screen">
+
+    <div class="ticket">
+      <div class="ticket-title">Matières premières</div>
+      <form id="ingredient-form">
+        <label for="ing-nom">Nom de l'ingrédient</label>
+        <input type="text" id="ing-nom" placeholder="ex. Jambon cuit">
+        <div class="row-split">
+          <div>
+            <label for="ing-unite">Unité</label>
+            <select id="ing-unite">
+              <option value="kg">kg</option>
+              <option value="l">litre</option>
+              <option value="piece">pièce</option>
+            </select>
+          </div>
+          <div>
+            <label for="ing-cout">Coût par unité (€)</label>
+            <input type="number" step="0.01" min="0" id="ing-cout" placeholder="0,00">
+          </div>
+        </div>
+        <button type="submit" class="primary">Ajouter l'ingrédient</button>
+      </form>
+      <div class="section-gap"></div>
+      <div id="ingredients-list"></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-title">Ma carte</div>
+      <button type="button" id="add-product-btn" class="primary">Ajouter un produit</button>
+      <div class="section-gap"></div>
+      <div id="products-list"></div>
+    </div>
+
+    <div id="product-form-panel" class="ticket" style="display:none">
+      <div class="ticket-title" id="product-form-title">Ajouter un produit</div>
+      <form id="product-form">
+        <label for="prod-nom">Nom du produit</label>
+        <input type="text" id="prod-nom" placeholder="ex. Sandwich jambon">
+
+        <label for="prod-type">Type</label>
+        <select id="prod-type">
+          <option value="repas">Repas</option>
+          <option value="alcool">Boisson alcoolisée</option>
+          <option value="nonalcool">Boisson non-alcoolisée</option>
+        </select>
+
+        <div class="row-split">
+          <div>
+            <label for="prod-prix">Prix de vente (€, TTC)</label>
+            <input type="number" step="0.01" min="0" id="prod-prix" placeholder="0,00">
+          </div>
+          <div>
+            <label for="prod-temps">Temps de préparation (min, optionnel)</label>
+            <input type="number" step="0.1" min="0" id="prod-temps" placeholder="ex. 3">
+          </div>
+        </div>
+
+        <div class="section-gap"></div>
+        <div class="ticket-title">Recette</div>
+        <div id="recette-lines"></div>
+        <div class="row-split section-gap">
+          <div>
+            <label for="recette-ingredient-select">Ingrédient</label>
+            <select id="recette-ingredient-select"></select>
+          </div>
+          <div>
+            <label for="recette-quantite">Quantité (unité de l'ingrédient)</label>
+            <input type="number" step="0.001" min="0" id="recette-quantite" placeholder="ex. 0,08">
+          </div>
+        </div>
+        <button type="button" id="recette-add-btn" class="secondary">Ajouter à la recette</button>
+
+        <div class="section-gap"></div>
+        <button type="submit" class="primary">Enregistrer le produit</button>
+        <button type="button" id="product-form-cancel" class="secondary">Annuler</button>
+      </form>
+    </div>
+
+  </section>
+
+  <!-- ================= ÉCRAN 4 : PARAMÈTRES ================= -->
+  <section id="screen-settings" class="screen">
+    <form id="settings-form" class="ticket">
+      <div class="ticket-title">TVA — Repas</div>
+      <div class="row-split">
+        <div>
+          <label for="set-tva-repas-sp">Sur place (%)</label>
+          <input type="number" step="0.1" id="set-tva-repas-sp">
+        </div>
+        <div>
+          <label for="set-tva-repas-emp">À emporter (%)</label>
+          <input type="number" step="0.1" id="set-tva-repas-emp">
+        </div>
+      </div>
+
+      <div class="ticket-title section-gap">TVA — Boissons</div>
+      <label for="set-tva-alcool">Alcoolisées (%, sur place et à emporter)</label>
+      <input type="number" step="0.1" id="set-tva-alcool">
+      <div class="row-split">
+        <div>
+          <label for="set-tva-nonalcool-sp">Non-alcool sur place (%)</label>
+          <input type="number" step="0.1" id="set-tva-nonalcool-sp">
+        </div>
+        <div>
+          <label for="set-tva-nonalcool-emp">Non-alcool à emporter (%)</label>
+          <input type="number" step="0.1" id="set-tva-nonalcool-emp">
+        </div>
+      </div>
+
+      <div class="ticket-title section-gap">Charges</div>
+      <label for="set-charges-fixes">Charges fixes mensuelles (€)</label>
+      <input type="number" step="0.01" id="set-charges-fixes">
+      <label for="set-jours-mois">Jours ouvrés par mois</label>
+      <input type="number" step="1" id="set-jours-mois">
+      <label for="set-cotisations">Cotisations sociales / trimestre (€)</label>
+      <input type="number" step="0.01" id="set-cotisations">
+      <label for="set-jours-trimestre">Jours ouvrés par trimestre</label>
+      <input type="number" step="1" id="set-jours-trimestre">
+      <label for="set-taux-impot">Provision impôt (% du bénéfice avant impôt)</label>
+      <input type="number" step="0.1" id="set-taux-impot">
+      <label for="set-cout-etudiant">Coût horaire total employeur par étudiant (€/h)</label>
+      <input type="number" step="0.01" id="set-cout-etudiant">
+
+      <div class="section-gap"></div>
+      <div class="ticket-title">Sauvegarde OneDrive</div>
+      <label for="set-webhook">Adresse du webhook Make.com</label>
+      <input type="text" id="set-webhook" placeholder="https://hook.eu1.make.com/...">
+      <div class="field-note">La sauvegarde part automatiquement quand l'app se ferme ou passe en arrière-plan.</div>
+
+      <button type="submit" class="primary">Enregistrer les paramètres</button>
+      <div id="settings-saved-msg" style="display:none; text-align:center; color:var(--green); font-size:13px; margin-top:8px;">Paramètres enregistrés ✓</div>
+      <button type="button" id="restore-btn" class="secondary">Restaurer l'historique depuis OneDrive</button>
+    </form>
+  </section>
+
+</main>
+
+<nav class="tabbar">
+  <button id="tab-saisie" type="button">Saisie</button>
+  <button id="tab-dashboard" type="button">Résultats</button>
+  <button id="tab-produits" type="button">Produits</button>
+  <button id="tab-settings" type="button">Paramètres</button>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
