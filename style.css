@@ -335,3 +335,75 @@ select {
   background: #fff;
   color: var(--ink);
 }
+
+/* ============================================================
+   Aide contextuelle (icône "?" + modale)
+   ============================================================ */
+.ticket-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ticket-title-row .ticket-title { margin: 0; }
+
+.help-btn {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--green);
+  background: #fff;
+  color: var(--green);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+.help-btn:active { background: var(--green-soft); }
+
+.help-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 1000;
+  align-items: flex-end;
+  justify-content: center;
+}
+.help-modal-box {
+  background: var(--paper, #fff);
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
+  padding: 18px 18px 28px;
+}
+.help-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.help-modal-close {
+  border: none;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--ink);
+  padding: 0 6px;
+}
+.help-modal-body {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.link-btn {
+  border: none;
+  background: none;
+  color: var(--green);
+  text-decoration: underline;
+  font-size: 12px;
+  padding: 0;
+}

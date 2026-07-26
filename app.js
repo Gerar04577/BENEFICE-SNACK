@@ -7,6 +7,7 @@ const KEYS = {
   settings: "benefice-snack:settings",
   ingredients: "benefice-snack:ingredients",
   products: "benefice-snack:products",
+  investissements: "benefice-snack:investissements",
   pendingSync: "benefice-snack:pendingSync",
   seeded: "benefice-snack:seeded"
 };
@@ -17,13 +18,95 @@ const DEFAULT_SETTINGS = {
   tvaAlcool: 21,
   tvaNonAlcoolSurPlace: 21,
   tvaNonAlcoolEmporter: 6,
-  chargesFixesMensuelles: 0,
+
+  // Charges fixes détaillées (€/mois) — leur somme remplace l'ancien champ unique
+  chargeLoyer: 0,
+  chargeEnergie: 0,
+  chargeAssurances: 0,
+  chargeComptable: 0,
+  chargeAbonnements: 0,
+  chargeEntretien: 0,
+  chargeTaxesLocales: 0,
+  chargeEmprunt: 0,
+
   joursOuvresParMois: 26,
   cotisationsTrimestrielles: 0,
   joursOuvresParTrimestre: 78,
-  tauxProvisionImpot: 25,
+
+  // Provision impôt progressive (barème IPP belge — indexé chaque année, à vérifier/ajuster)
+  quotiteExemptee: 10910,
+  trancheSeuil1: 16320,
+  trancheSeuil2: 28800,
+  trancheSeuil3: 49840,
+  trancheTaux1: 25,
+  trancheTaux2: 40,
+  trancheTaux3: 45,
+  trancheTaux4: 50,
+  additionnelsCommunaux: 0,
+
   coutHoraireEtudiant: 0,
   webhookUrl: ""
+};
+
+// Catégories d'investissement — durée d'amortissement usuelle (années), barème belge communément admis
+const CATEGORIES_INVESTISSEMENT = {
+  informatique: { label: "Informatique / caisse (TPV)", duree: 3 },
+  logiciel: { label: "Logiciel", duree: 1 },
+  cuisson: { label: "Matériel de cuisson (four, plaques)", duree: 6 },
+  froid: { label: "Froid / hotte / ventilation", duree: 8 },
+  mobilier: { label: "Mobilier / agencement", duree: 7 },
+  vehicule: { label: "Véhicule", duree: 5 },
+  travaux: { label: "Travaux / aménagements du local", duree: 10 },
+  batiment: { label: "Bâtiment (si propriétaire)", duree: 25 },
+  autre: { label: "Autre investissement", duree: 5 }
+};
+
+// Textes d'aide contextuelle (icône "?") — à destination directe de l'utilisatrice
+const HELP_TEXTS = {
+  "charges-fixes": {
+    titre: "Comment remplir les charges fixes",
+    corps: `Indiquez ici vos frais qui reviennent chaque mois, même les jours où le snack est fermé.
+<br><br>
+<b>Loyer</b> : le loyer mensuel du local (+ charges locatives si séparées).<br>
+<b>Énergie</b> : électricité, gaz et eau ensemble, en moyenne mensuelle.<br>
+<b>Assurances</b> : RC professionnelle, incendie, matériel.<br>
+<b>Comptable / secrétariat social</b> : ce que vous payez chaque mois pour la compta et les cotisations.<br>
+<b>Abonnements</b> : logiciel de caisse, téléphone, internet.<br>
+<b>Entretien</b> : nettoyage, enlèvement des déchets/graisses.<br>
+<b>Taxes locales</b> : taxe commune, enseigne, terrasse.<br>
+<b>Remboursement d'emprunt</b> : mensualité si un crédit a servi à financer le matériel ou le local.
+<br><br>
+Le total est calculé automatiquement et utilisé pour répartir ces frais sur chaque jour ouvré du mois.`
+  },
+  "investissements": {
+    titre: "Comment remplir les investissements",
+    corps: `Un investissement est un achat destiné à durer plusieurs années (four, frigo, caisse, mobilier, véhicule...) — pas un achat de matière première du jour.
+<br><br>
+Pour chaque investissement, indiquez :<br>
+<b>Nom</b> : ex. "Friteuse professionnelle".<br>
+<b>Montant</b> : prix payé (TVA comprise si vous ne récupérez pas la TVA).<br>
+<b>Catégorie</b> : choisissez celle qui correspond le mieux — la durée d'amortissement se remplit toute seule selon le barème belge habituel.<br>
+<b>Date de mise en service</b> : le jour où vous avez commencé à l'utiliser (pas forcément la date d'achat).
+<br><br>
+L'app répartit alors automatiquement le coût sur la durée indiquée et l'intègre dans le calcul du bénéfice, comme une charge fixe mensuelle supplémentaire.
+<br><br>
+<b>Exception importante — petit matériel de moins de 500 € :</b><br>
+Si le montant payé est <b>inférieur à 500 €</b> (ex. un petit ustensile, une petite friteuse d'appoint), l'app ne l'étale <b>pas</b> sur plusieurs années. Elle déduit le montant <b>en une seule fois</b>, le mois où vous l'avez mis en service — c'est la règle fiscale belge pour le "petit matériel". Peu importe la catégorie choisie dans ce cas : c'est uniquement le montant qui décide. Au-delà de 500 €, l'étalement sur plusieurs années s'applique normalement.
+<br><br>
+⚠️ Les durées proposées sont "communément admises" mais pas gravées dans le marbre — demandez confirmation à votre comptable, qui peut les ajuster selon le bien réel.`
+  },
+  "provision-impot": {
+    titre: "Comment fonctionne la provision impôt",
+    corps: `L'app met de côté chaque jour une partie du bénéfice pour anticiper l'impôt à payer plus tard, en suivant le vrai système progressif belge :
+<br><br>
+- Les premiers <b>10 910 €</b> gagnés dans l'année (quotité exemptée) ne sont quasiment pas taxés.<br>
+- Ensuite, le taux appliqué augmente par paliers : <b>25% → 40% → 45% → 50%</b> selon le cumul déjà gagné depuis le 1er janvier.<br>
+- Concrètement : un même bénéfice de 500 € sera peu taxé en janvier, et plus taxé en décembre si l'année a été bonne.
+<br><br>
+Les <b>seuils et taux</b> sont à vérifier chaque année (ils sont indexés), et le champ <b>additionnels communaux</b> dépend de la commune — demandez ces deux informations au comptable.
+<br><br>
+⚠️ Ceci reste une estimation de trésorerie, pas une déclaration fiscale officielle — surtout si le snack n'est pas l'unique revenu du foyer.`
+  }
 };
 
 const TYPE_LABELS = {
@@ -58,6 +141,130 @@ function saveIngredients(list) { saveJSON(KEYS.ingredients, list); }
 
 function loadProducts() { return loadJSON(KEYS.products, []); }
 function saveProducts(list) { saveJSON(KEYS.products, list); }
+
+function loadInvestissements() { return loadJSON(KEYS.investissements, []); }
+function saveInvestissements(list) { saveJSON(KEYS.investissements, list); }
+
+/* ============================================================
+   Charges fixes totales (somme des sous-postes)
+   ============================================================ */
+function totalChargesFixes(settings) {
+  return (settings.chargeLoyer || 0) + (settings.chargeEnergie || 0) + (settings.chargeAssurances || 0) +
+    (settings.chargeComptable || 0) + (settings.chargeAbonnements || 0) + (settings.chargeEntretien || 0) +
+    (settings.chargeTaxesLocales || 0) + (settings.chargeEmprunt || 0);
+}
+
+/* ============================================================
+   Amortissement des investissements
+   ============================================================ */
+// Seuil belge : en dessous de ce montant (HTVA), le petit matériel est déduit
+// en une fois, l'année de son achat, plutôt qu'amorti sur plusieurs années.
+const SEUIL_PETIT_MATERIEL = 500;
+
+function estPetitMateriel(inv) {
+  return (inv.montant || 0) < SEUIL_PETIT_MATERIEL;
+}
+
+// Amortissement mensuel total encore actif à une date donnée (les investissements
+// totalement amortis, au-delà de leur durée, ne comptent plus ; le petit matériel
+// <500€ est compté en entier sur le seul mois de sa mise en service, puis plus rien).
+function totalAmortissementMensuel(dateStr, investissements) {
+  const date = new Date(dateStr + "T00:00:00");
+  return investissements.reduce((sum, inv) => {
+    const debut = new Date(inv.dateMiseEnService + "T00:00:00");
+    if (isNaN(debut.getTime())) return sum;
+
+    if (estPetitMateriel(inv)) {
+      // Déduit intégralement le mois de mise en service uniquement.
+      const memeMois = date.getFullYear() === debut.getFullYear() && date.getMonth() === debut.getMonth();
+      return memeMois ? sum + (inv.montant || 0) : sum;
+    }
+
+    const cat = CATEGORIES_INVESTISSEMENT[inv.categorie] || CATEGORIES_INVESTISSEMENT.autre;
+    const duree = inv.dureeAnnees || cat.duree || 5;
+    if (date < debut) return sum;
+    const finAmortissement = new Date(debut);
+    finAmortissement.setFullYear(finAmortissement.getFullYear() + duree);
+    if (date >= finAmortissement) return sum;
+    return sum + (inv.montant || 0) / duree / 12;
+  }, 0);
+}
+
+/* ============================================================
+   Provision impôt progressive (barème IPP belge)
+   ============================================================ */
+// Impôt brut par tranches, sur un revenu imposable donné (avant réduction quotité exemptée).
+function impotBrutParTranches(revenu, settings) {
+  if (revenu <= 0) return 0;
+  const paliers = [
+    { seuil: settings.trancheSeuil1, taux: settings.trancheTaux1 },
+    { seuil: settings.trancheSeuil2, taux: settings.trancheTaux2 },
+    { seuil: settings.trancheSeuil3, taux: settings.trancheTaux3 },
+    { seuil: Infinity, taux: settings.trancheTaux4 }
+  ];
+  let impot = 0;
+  let bas = 0;
+  for (const p of paliers) {
+    const haut = Math.min(revenu, p.seuil);
+    if (haut > bas) impot += (haut - bas) * (p.taux / 100);
+    bas = p.seuil;
+    if (revenu <= p.seuil) break;
+  }
+  return impot;
+}
+
+// Impôt net total dû sur un cumul de revenu depuis le 1er janvier (réduction quotité
+// exemptée + additionnels communaux appliqués).
+function impotNetCumule(revenu, settings) {
+  if (revenu <= 0) return 0;
+  const brut = impotBrutParTranches(revenu, settings);
+  const reduction = (settings.quotiteExemptee || 0) * ((settings.trancheTaux1 || 0) / 100);
+  const net = Math.max(0, brut - reduction);
+  return net * (1 + (settings.additionnelsCommunaux || 0) / 100);
+}
+
+// Détermine dans quelle tranche se situe un cumul de revenu (index 0 à 3), pour détecter
+// un changement de palier entre deux cumuls.
+function trancheIndex(revenu, settings) {
+  if (revenu <= (settings.quotiteExemptee || 0)) return -1;
+  if (revenu <= settings.trancheSeuil1) return 0;
+  if (revenu <= settings.trancheSeuil2) return 1;
+  if (revenu <= settings.trancheSeuil3) return 2;
+  return 3;
+}
+
+const TRANCHE_TAUX_LABELS = (s) => [s.trancheTaux1, s.trancheTaux2, s.trancheTaux3, s.trancheTaux4];
+
+// Cumul du bénéfice avant impôt depuis le 1er janvier de l'année de `date`, en excluant
+// cette date elle-même (pour connaître le point de départ AVANT le jour en cours).
+function cumulBeneficeAvantImpotDepuisJanvier(dateStr, settings, products, ingredients) {
+  const annee = dateStr.slice(0, 4);
+  const entries = loadEntries().filter((e) => e.date.slice(0, 4) === annee && e.date < dateStr);
+  return entries.reduce((sum, e) => sum + computeDayBeneficeAvantImpot(e, settings, products, ingredients), 0);
+}
+
+// Version allégée de computeDay qui ne calcule que le bénéfice avant impôt (utilisée
+// pour reconstruire le cumul annuel sans recalculer toute la structure d'affichage).
+function computeDayBeneficeAvantImpot(entry, settings, products, ingredients) {
+  const productsById = Object.fromEntries(products.map((p) => [p.id, p]));
+  let ventesHTTotal = 0;
+  (entry.ventes || []).forEach((v) => {
+    const p = productsById[v.productId];
+    if (!p) return;
+    const qteSurPlace = v.qteSurPlace || 0;
+    const qteEmporter = v.qteEmporter || 0;
+    const qteTotal = qteSurPlace + qteEmporter;
+    if (qteTotal === 0) return;
+    const tauxSP = tauxTVA(p.type, "surPlace", settings);
+    const tauxEmp = tauxTVA(p.type, "emporter", settings);
+    ventesHTTotal += (qteSurPlace * p.prixVente) / (1 + tauxSP / 100) + (qteEmporter * p.prixVente) / (1 + tauxEmp / 100);
+  });
+  const chargesFixesJour = totalChargesFixes(settings) / (settings.joursOuvresParMois || 1);
+  const amortissementJour = totalAmortissementMensuel(entry.date, loadInvestissements()) / (settings.joursOuvresParMois || 1);
+  const cotisationsJour = settings.cotisationsTrimestrielles / (settings.joursOuvresParTrimestre || 1);
+  const coutEtudiantsJour = (entry.heuresEtudiants || 0) * settings.coutHoraireEtudiant;
+  return ventesHTTotal - (entry.achats || 0) - chargesFixesJour - amortissementJour - cotisationsJour - coutEtudiantsJour - (entry.chargesExceptionnelles || 0);
+}
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function eur(n) {
@@ -192,13 +399,31 @@ function computeDay(entry, settings, products, ingredients) {
     });
   });
 
-  const chargesFixesJour = settings.chargesFixesMensuelles / (settings.joursOuvresParMois || 1);
+  const chargesFixesJour = totalChargesFixes(settings) / (settings.joursOuvresParMois || 1);
+  const amortissementJour = totalAmortissementMensuel(entry.date, loadInvestissements()) / (settings.joursOuvresParMois || 1);
   const cotisationsJour = settings.cotisationsTrimestrielles / (settings.joursOuvresParTrimestre || 1);
   const coutEtudiantsJour = (entry.heuresEtudiants || 0) * settings.coutHoraireEtudiant;
 
   const beneficeAvantImpot =
-    ventesHTTotal - (entry.achats || 0) - chargesFixesJour - cotisationsJour - coutEtudiantsJour - (entry.chargesExceptionnelles || 0);
-  const provisionImpot = beneficeAvantImpot > 0 ? beneficeAvantImpot * (settings.tauxProvisionImpot / 100) : 0;
+    ventesHTTotal - (entry.achats || 0) - chargesFixesJour - amortissementJour - cotisationsJour - coutEtudiantsJour - (entry.chargesExceptionnelles || 0);
+
+  // Provision impôt progressive : impôt marginal du jour = impôt(cumul+jour) − impôt(cumul avant).
+  const cumulAvant = cumulBeneficeAvantImpotDepuisJanvier(entry.date, settings, products, ingredients);
+  let provisionImpot = 0;
+  let changementTranche = null;
+  if (beneficeAvantImpot > 0) {
+    const cumulApres = cumulAvant + beneficeAvantImpot;
+    provisionImpot = Math.max(0, impotNetCumule(cumulApres, settings) - impotNetCumule(cumulAvant, settings));
+    const tAvant = trancheIndex(cumulAvant, settings);
+    const tApres = trancheIndex(cumulApres, settings);
+    if (tApres > tAvant) {
+      const nouveauTaux = TRANCHE_TAUX_LABELS(settings)[Math.max(tApres, 0)];
+      changementTranche = {
+        nouveauTaux,
+        message: `Bonne nouvelle et attention à la fois : le bénéfice cumulé de l'année vient de franchir un nouveau seuil d'imposition. À partir de maintenant, chaque euro supplémentaire gagné cette année est provisionné à ${nouveauTaux}% (au lieu du taux précédent) — c'est pour ça que la provision d'aujourd'hui est plus élevée que d'habitude. C'est normal : plus on gagne dans l'année, plus la tranche marginale monte.`
+      };
+    }
+  }
   const beneficeNet = beneficeAvantImpot - provisionImpot;
 
   lignes.sort((a, b) => {
@@ -207,7 +432,7 @@ function computeDay(entry, settings, products, ingredients) {
     return scoreB - scoreA;
   });
 
-  return { lignes, ventesHTTotal, chargesFixesJour, cotisationsJour, coutEtudiantsJour, beneficeAvantImpot, provisionImpot, beneficeNet };
+  return { lignes, ventesHTTotal, chargesFixesJour, amortissementJour, cotisationsJour, coutEtudiantsJour, beneficeAvantImpot, provisionImpot, beneficeNet, changementTranche };
 }
 
 /* ============================================================
@@ -221,6 +446,7 @@ function showScreen(name) {
   if (name === "saisie") renderSaisieScreen();
   if (name === "dashboard") renderDashboard();
   if (name === "produits") renderProduitsScreen();
+  if (name === "investissements") renderInvestissementsScreen();
   if (name === "settings") renderSettingsForm();
 }
 
@@ -349,6 +575,11 @@ function renderResult(entry, settings, products, ingredients) {
     ? `<div class="field-note section-gap">${buildAdvice(r.lignes)}</div>`
     : "";
 
+  const tauxJour = r.beneficeAvantImpot > 0 ? ((r.provisionImpot / r.beneficeAvantImpot) * 100).toFixed(1) : "0";
+  const alerteTranche = r.changementTranche
+    ? `<div class="field-note section-gap" style="border-left:3px solid var(--green); padding-left:8px;">⚠️ ${r.changementTranche.message}</div>`
+    : "";
+
   box.innerHTML = `
     <div class="stamp-wrap">
       <div class="stamp ${negative ? "negative" : ""}">
@@ -360,8 +591,10 @@ function renderResult(entry, settings, products, ingredients) {
     <div class="detail-line"><span>Achats matières (réel)</span><span>-${eur(entry.achats)}</span></div>
     <div class="detail-line"><span>Coût étudiants du jour</span><span>-${eur(r.coutEtudiantsJour)}</span></div>
     <div class="detail-line"><span>Charges fixes (quote-part jour)</span><span>-${eur(r.chargesFixesJour)}</span></div>
+    <div class="detail-line"><span>Amortissement investissements (quote-part jour)</span><span>-${eur(r.amortissementJour)}</span></div>
     <div class="detail-line"><span>Cotisations sociales (quote-part jour)</span><span>-${eur(r.cotisationsJour)}</span></div>
-    <div class="detail-line"><span>Provision impôt (${settings.tauxProvisionImpot}%)</span><span>-${eur(r.provisionImpot)}</span></div>
+    <div class="detail-line"><span>Provision impôt (${tauxJour}% de ce jour)</span><span>-${eur(r.provisionImpot)}</span></div>
+    ${alerteTranche}
     <div class="ticket-title section-gap">Rentabilité par produit (marge € · marge/min)</div>
     ${lignesHtml || '<div class="field-note">Aucune vente saisie.</div>'}
     ${conseil}
@@ -580,6 +813,81 @@ function handleSaveProduct(evt) {
 }
 
 /* ============================================================
+   Écran Investissements
+   ============================================================ */
+function renderInvestissementsScreen() {
+  const options = Object.entries(CATEGORIES_INVESTISSEMENT)
+    .map(([key, c]) => `<option value="${key}">${c.label} (${c.duree} ans)</option>`).join("");
+  document.getElementById("inv-categorie").innerHTML = options;
+  renderInvestissementsList();
+}
+
+function renderInvestissementsList() {
+  const list = loadInvestissements().slice().sort((a, b) => (b.dateMiseEnService || "").localeCompare(a.dateMiseEnService || ""));
+  const el = document.getElementById("investissements-list");
+  if (list.length === 0) {
+    el.innerHTML = `<div class="empty-state">Aucun investissement enregistré.</div>`;
+    return;
+  }
+  el.innerHTML = list.map((inv) => {
+    if (estPetitMateriel(inv)) {
+      return `
+        <div class="detail-line">
+          <span>${inv.nom} — Petit matériel<br><span class="field-note">${eur(inv.montant)} · déduit en une fois le mois du ${inv.dateMiseEnService} (< ${SEUIL_PETIT_MATERIEL} €)</span></span>
+          <span>-${eur(inv.montant)} (1 mois) <button type="button" class="link-btn" data-del-inv="${inv.id}">supprimer</button></span>
+        </div>`;
+    }
+    const cat = CATEGORIES_INVESTISSEMENT[inv.categorie] || CATEGORIES_INVESTISSEMENT.autre;
+    const duree = inv.dureeAnnees || cat.duree;
+    const mensuel = (inv.montant || 0) / duree / 12;
+    return `
+      <div class="detail-line">
+        <span>${inv.nom} — ${cat.label}<br><span class="field-note">${eur(inv.montant)} · dès le ${inv.dateMiseEnService} · sur ${duree} ans</span></span>
+        <span>-${eur(mensuel)}/mois <button type="button" class="link-btn" data-del-inv="${inv.id}">supprimer</button></span>
+      </div>`;
+  }).join("");
+  el.querySelectorAll("[data-del-inv]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const list = loadInvestissements().filter((i) => i.id !== btn.dataset.delInv);
+      saveInvestissements(list);
+      renderInvestissementsList();
+    });
+  });
+}
+
+function handleAddInvestissement(evt) {
+  evt.preventDefault();
+  const nom = document.getElementById("inv-nom").value.trim();
+  const montant = parseFloat(document.getElementById("inv-montant").value) || 0;
+  const categorie = document.getElementById("inv-categorie").value;
+  const dateMiseEnService = document.getElementById("inv-date").value || todayISO();
+  if (!nom || montant <= 0) return;
+
+  const list = loadInvestissements();
+  list.push({ id: uid(), nom, montant, categorie, dateMiseEnService });
+  saveInvestissements(list);
+
+  document.getElementById("inv-nom").value = "";
+  document.getElementById("inv-montant").value = "";
+  document.getElementById("inv-date").value = "";
+  renderInvestissementsList();
+}
+
+/* ============================================================
+   Aide contextuelle (icône "?")
+   ============================================================ */
+function showHelp(key) {
+  const help = HELP_TEXTS[key];
+  if (!help) return;
+  document.getElementById("help-modal-title").textContent = help.titre;
+  document.getElementById("help-modal-body").innerHTML = help.corps;
+  document.getElementById("help-modal").style.display = "flex";
+}
+function hideHelp() {
+  document.getElementById("help-modal").style.display = "none";
+}
+
+/* ============================================================
    Écran Paramètres
    ============================================================ */
 function renderSettingsForm() {
@@ -589,13 +897,41 @@ function renderSettingsForm() {
   document.getElementById("set-tva-alcool").value = s.tvaAlcool;
   document.getElementById("set-tva-nonalcool-sp").value = s.tvaNonAlcoolSurPlace;
   document.getElementById("set-tva-nonalcool-emp").value = s.tvaNonAlcoolEmporter;
-  document.getElementById("set-charges-fixes").value = s.chargesFixesMensuelles;
+
+  document.getElementById("set-charge-loyer").value = s.chargeLoyer;
+  document.getElementById("set-charge-energie").value = s.chargeEnergie;
+  document.getElementById("set-charge-assurances").value = s.chargeAssurances;
+  document.getElementById("set-charge-comptable").value = s.chargeComptable;
+  document.getElementById("set-charge-abonnements").value = s.chargeAbonnements;
+  document.getElementById("set-charge-entretien").value = s.chargeEntretien;
+  document.getElementById("set-charge-taxes-locales").value = s.chargeTaxesLocales;
+  document.getElementById("set-charge-emprunt").value = s.chargeEmprunt;
+  updateChargesFixesTotal();
+
   document.getElementById("set-jours-mois").value = s.joursOuvresParMois;
   document.getElementById("set-cotisations").value = s.cotisationsTrimestrielles;
   document.getElementById("set-jours-trimestre").value = s.joursOuvresParTrimestre;
-  document.getElementById("set-taux-impot").value = s.tauxProvisionImpot;
+
+  document.getElementById("set-quotite-exemptee").value = s.quotiteExemptee;
+  document.getElementById("set-tranche-seuil1").value = s.trancheSeuil1;
+  document.getElementById("set-tranche-seuil2").value = s.trancheSeuil2;
+  document.getElementById("set-tranche-seuil3").value = s.trancheSeuil3;
+  document.getElementById("set-tranche-taux1").value = s.trancheTaux1;
+  document.getElementById("set-tranche-taux2").value = s.trancheTaux2;
+  document.getElementById("set-tranche-taux3").value = s.trancheTaux3;
+  document.getElementById("set-tranche-taux4").value = s.trancheTaux4;
+  document.getElementById("set-additionnels-communaux").value = s.additionnelsCommunaux;
+
   document.getElementById("set-cout-etudiant").value = s.coutHoraireEtudiant;
   document.getElementById("set-webhook").value = s.webhookUrl;
+}
+
+function updateChargesFixesTotal() {
+  const val = (id) => parseFloat(document.getElementById(id).value) || 0;
+  const total = val("set-charge-loyer") + val("set-charge-energie") + val("set-charge-assurances") +
+    val("set-charge-comptable") + val("set-charge-abonnements") + val("set-charge-entretien") +
+    val("set-charge-taxes-locales") + val("set-charge-emprunt");
+  document.getElementById("charges-fixes-total").textContent = eur(total) + " / mois";
 }
 
 function handleSaveSettings(evt) {
@@ -606,11 +942,30 @@ function handleSaveSettings(evt) {
     tvaAlcool: parseFloat(document.getElementById("set-tva-alcool").value) || 0,
     tvaNonAlcoolSurPlace: parseFloat(document.getElementById("set-tva-nonalcool-sp").value) || 0,
     tvaNonAlcoolEmporter: parseFloat(document.getElementById("set-tva-nonalcool-emp").value) || 0,
-    chargesFixesMensuelles: parseFloat(document.getElementById("set-charges-fixes").value) || 0,
+
+    chargeLoyer: parseFloat(document.getElementById("set-charge-loyer").value) || 0,
+    chargeEnergie: parseFloat(document.getElementById("set-charge-energie").value) || 0,
+    chargeAssurances: parseFloat(document.getElementById("set-charge-assurances").value) || 0,
+    chargeComptable: parseFloat(document.getElementById("set-charge-comptable").value) || 0,
+    chargeAbonnements: parseFloat(document.getElementById("set-charge-abonnements").value) || 0,
+    chargeEntretien: parseFloat(document.getElementById("set-charge-entretien").value) || 0,
+    chargeTaxesLocales: parseFloat(document.getElementById("set-charge-taxes-locales").value) || 0,
+    chargeEmprunt: parseFloat(document.getElementById("set-charge-emprunt").value) || 0,
+
     joursOuvresParMois: parseFloat(document.getElementById("set-jours-mois").value) || 26,
     cotisationsTrimestrielles: parseFloat(document.getElementById("set-cotisations").value) || 0,
     joursOuvresParTrimestre: parseFloat(document.getElementById("set-jours-trimestre").value) || 78,
-    tauxProvisionImpot: parseFloat(document.getElementById("set-taux-impot").value) || 0,
+
+    quotiteExemptee: parseFloat(document.getElementById("set-quotite-exemptee").value) || 0,
+    trancheSeuil1: parseFloat(document.getElementById("set-tranche-seuil1").value) || 0,
+    trancheSeuil2: parseFloat(document.getElementById("set-tranche-seuil2").value) || 0,
+    trancheSeuil3: parseFloat(document.getElementById("set-tranche-seuil3").value) || 0,
+    trancheTaux1: parseFloat(document.getElementById("set-tranche-taux1").value) || 0,
+    trancheTaux2: parseFloat(document.getElementById("set-tranche-taux2").value) || 0,
+    trancheTaux3: parseFloat(document.getElementById("set-tranche-taux3").value) || 0,
+    trancheTaux4: parseFloat(document.getElementById("set-tranche-taux4").value) || 0,
+    additionnelsCommunaux: parseFloat(document.getElementById("set-additionnels-communaux").value) || 0,
+
     coutHoraireEtudiant: parseFloat(document.getElementById("set-cout-etudiant").value) || 0,
     webhookUrl: document.getElementById("set-webhook").value.trim()
   };
@@ -640,7 +995,8 @@ function attemptBackgroundSync(reason) {
     settings,
     entries: loadEntries(),
     ingredients: loadIngredients(),
-    products: loadProducts()
+    products: loadProducts(),
+    investissements: loadInvestissements()
   };
 
   fetch(settings.webhookUrl, {
@@ -683,6 +1039,7 @@ function handleRestore() {
         if (data.settings) saveSettings({ ...DEFAULT_SETTINGS, ...data.settings });
         if (data.ingredients) saveIngredients(data.ingredients);
         if (data.products) saveProducts(data.products);
+        if (data.investissements) saveInvestissements(data.investissements);
         clearPendingSync();
         alert("Historique restauré depuis OneDrive.");
         renderDashboard();
@@ -704,7 +1061,22 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("tab-saisie").addEventListener("click", () => showScreen("saisie"));
   document.getElementById("tab-dashboard").addEventListener("click", () => showScreen("dashboard"));
   document.getElementById("tab-produits").addEventListener("click", () => showScreen("produits"));
+  document.getElementById("tab-investissements").addEventListener("click", () => showScreen("investissements"));
   document.getElementById("tab-settings").addEventListener("click", () => showScreen("settings"));
+
+  document.getElementById("investissement-form").addEventListener("submit", handleAddInvestissement);
+
+  document.querySelectorAll("[data-help]").forEach((btn) => {
+    btn.addEventListener("click", () => showHelp(btn.dataset.help));
+  });
+  document.getElementById("help-modal-close").addEventListener("click", hideHelp);
+  document.getElementById("help-modal").addEventListener("click", (e) => {
+    if (e.target.id === "help-modal") hideHelp();
+  });
+
+  document.querySelectorAll("#settings-form input[id^='set-charge-']").forEach((input) => {
+    input.addEventListener("input", updateChargesFixesTotal);
+  });
 
   document.getElementById("save-form").addEventListener("submit", handleSaveEntry);
   document.getElementById("input-date").addEventListener("change", (e) => renderProductCounters(e.target.value || todayISO()));

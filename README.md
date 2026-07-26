@@ -43,3 +43,13 @@ L'app démarre avec 3 sandwichs (Mitraillette/Américain, Jambon-fromage-crudit�
 ## 5. Rappel important
 
 Cette app donne une estimation de pilotage quotidienne, pas une déclaration officielle. La ventilation exacte TVA repas/boissons/à emporter et le montant réel des cotisations sociales restent à valider avec le comptable.
+
+## 6. Nouveautés — charges détaillées, investissements, impôt progressif
+
+- **Charges fixes** (Paramètres) : désormais réparties en plusieurs postes (loyer, énergie, assurances, comptable, abonnements, entretien, taxes locales, remboursement d'emprunt). Le total se calcule automatiquement.
+- **Investissements** (nouvel onglet "Invest.") : chaque achat durable (matériel de cuisson, froid, informatique, mobilier, véhicule, travaux...) s'y encode avec son montant et sa date de mise en service. L'app calcule elle-même la quote-part mensuelle amortie selon des durées usuelles du secteur (ex. informatique 3 ans, cuisson 5-7 ans) et l'intègre au bénéfice net. **Exception "petit matériel" : en dessous de 500 €, l'app déduit le montant en une seule fois** (le mois de mise en service), au lieu de l'étaler — conformément à la règle fiscale belge, peu importe la catégorie choisie. **Ces durées et ce seuil sont "communément admis" mais pas légalement figés — à faire valider par le comptable.**
+- **Provision impôt progressive** (Paramètres) : remplace l'ancien taux fixe. Le calcul suit le vrai barème belge par tranches (quotité exemptée + 4 tranches 25/40/45/50%), appliqué sur le cumul du bénéfice depuis le 1er janvier. Une alerte explicative apparaît dans l'écran Saisie chaque fois qu'un changement de tranche fait grimper la provision du jour. **Seuils, taux et additionnels communaux sont indexés chaque année — à vérifier/ajuster avec le comptable, surtout si le snack n'est pas l'unique revenu du foyer.**
+- **Aide contextuelle** : une icône "?" à côté des titres "Charges fixes mensuelles", "Provision impôt" et "Investissements" ouvre une explication simple de ce qu'il faut remplir, pensée pour que votre belle-fille puisse s'en servir seule.
+
+### Vérifications effectuées
+Le calcul par tranches a été comparé à un exemple officiel vérifié (revenu imposable 30 000 € → impôt net 6 884,50 €) : résultat identique. Le calcul de la provision marginale lors d'un franchissement de seuil a aussi été vérifié manuellement (352 € sur une tranche de 1 000 € à cheval sur deux paliers). Testé en conditions réelles de navigateur, aucune erreur JS.

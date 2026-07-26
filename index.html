@@ -141,6 +141,35 @@
 
   </section>
 
+  <!-- ================= ÉCRAN : INVESTISSEMENTS ================= -->
+  <section id="screen-investissements" class="screen">
+    <div class="ticket">
+      <div class="ticket-title-row">
+        <div class="ticket-title">Investissements</div>
+        <button type="button" class="help-btn" data-help="investissements">?</button>
+      </div>
+      <form id="investissement-form">
+        <label for="inv-nom">Nom de l'investissement</label>
+        <input type="text" id="inv-nom" placeholder="ex. Friteuse professionnelle">
+        <div class="row-split">
+          <div>
+            <label for="inv-montant">Montant (€)</label>
+            <input type="number" step="0.01" min="0" id="inv-montant" placeholder="0,00">
+          </div>
+          <div>
+            <label for="inv-date">Date de mise en service</label>
+            <input type="date" id="inv-date">
+          </div>
+        </div>
+        <label for="inv-categorie">Catégorie</label>
+        <select id="inv-categorie"></select>
+        <button type="submit" class="primary">Ajouter l'investissement</button>
+      </form>
+      <div class="section-gap"></div>
+      <div id="investissements-list"></div>
+    </div>
+  </section>
+
   <!-- ================= ÉCRAN 4 : PARAMÈTRES ================= -->
   <section id="screen-settings" class="screen">
     <form id="settings-form" class="ticket">
@@ -170,19 +199,78 @@
         </div>
       </div>
 
-      <div class="ticket-title section-gap">Charges</div>
-      <label for="set-charges-fixes">Charges fixes mensuelles (€)</label>
-      <input type="number" step="0.01" id="set-charges-fixes">
+      <div class="ticket-title-row section-gap">
+        <div class="ticket-title">Charges fixes mensuelles</div>
+        <button type="button" class="help-btn" data-help="charges-fixes">?</button>
+      </div>
+      <label for="set-charge-loyer">Loyer (€/mois)</label>
+      <input type="number" step="0.01" id="set-charge-loyer">
+      <label for="set-charge-energie">Énergie — électricité, gaz, eau (€/mois)</label>
+      <input type="number" step="0.01" id="set-charge-energie">
+      <label for="set-charge-assurances">Assurances (€/mois)</label>
+      <input type="number" step="0.01" id="set-charge-assurances">
+      <label for="set-charge-comptable">Comptable / secrétariat social (€/mois)</label>
+      <input type="number" step="0.01" id="set-charge-comptable">
+      <label for="set-charge-abonnements">Abonnements — caisse, téléphone, internet (€/mois)</label>
+      <input type="number" step="0.01" id="set-charge-abonnements">
+      <label for="set-charge-entretien">Entretien — nettoyage, déchets (€/mois)</label>
+      <input type="number" step="0.01" id="set-charge-entretien">
+      <label for="set-charge-taxes-locales">Taxes locales — commune, enseigne, terrasse (€/mois)</label>
+      <input type="number" step="0.01" id="set-charge-taxes-locales">
+      <label for="set-charge-emprunt">Remboursement d'emprunt (€/mois)</label>
+      <input type="number" step="0.01" id="set-charge-emprunt">
+      <div class="detail-line" style="font-weight:600;"><span>Total charges fixes</span><span id="charges-fixes-total">0,00 €</span></div>
+
+      <div class="ticket-title section-gap">Autres charges</div>
       <label for="set-jours-mois">Jours ouvrés par mois</label>
       <input type="number" step="1" id="set-jours-mois">
       <label for="set-cotisations">Cotisations sociales / trimestre (€)</label>
       <input type="number" step="0.01" id="set-cotisations">
       <label for="set-jours-trimestre">Jours ouvrés par trimestre</label>
       <input type="number" step="1" id="set-jours-trimestre">
-      <label for="set-taux-impot">Provision impôt (% du bénéfice avant impôt)</label>
-      <input type="number" step="0.1" id="set-taux-impot">
       <label for="set-cout-etudiant">Coût horaire total employeur par étudiant (€/h)</label>
       <input type="number" step="0.01" id="set-cout-etudiant">
+
+      <div class="ticket-title-row section-gap">
+        <div class="ticket-title">Provision impôt (barème progressif belge)</div>
+        <button type="button" class="help-btn" data-help="provision-impot">?</button>
+      </div>
+      <label for="set-quotite-exemptee">Quotité exemptée (€/an, non taxée)</label>
+      <input type="number" step="1" id="set-quotite-exemptee">
+      <div class="row-split">
+        <div>
+          <label for="set-tranche-seuil1">Seuil tranche 1→2 (€)</label>
+          <input type="number" step="1" id="set-tranche-seuil1">
+        </div>
+        <div>
+          <label for="set-tranche-taux1">Taux tranche 1 (%)</label>
+          <input type="number" step="0.1" id="set-tranche-taux1">
+        </div>
+      </div>
+      <div class="row-split">
+        <div>
+          <label for="set-tranche-seuil2">Seuil tranche 2→3 (€)</label>
+          <input type="number" step="1" id="set-tranche-seuil2">
+        </div>
+        <div>
+          <label for="set-tranche-taux2">Taux tranche 2 (%)</label>
+          <input type="number" step="0.1" id="set-tranche-taux2">
+        </div>
+      </div>
+      <div class="row-split">
+        <div>
+          <label for="set-tranche-seuil3">Seuil tranche 3→4 (€)</label>
+          <input type="number" step="1" id="set-tranche-seuil3">
+        </div>
+        <div>
+          <label for="set-tranche-taux3">Taux tranche 3 (%)</label>
+          <input type="number" step="0.1" id="set-tranche-taux3">
+        </div>
+      </div>
+      <label for="set-tranche-taux4">Taux tranche 4, au-delà du dernier seuil (%)</label>
+      <input type="number" step="0.1" id="set-tranche-taux4">
+      <label for="set-additionnels-communaux">Additionnels communaux (%, à demander au comptable)</label>
+      <input type="number" step="0.1" id="set-additionnels-communaux">
 
       <div class="section-gap"></div>
       <div class="ticket-title">Sauvegarde OneDrive</div>
@@ -202,8 +290,19 @@
   <button id="tab-saisie" type="button">Saisie</button>
   <button id="tab-dashboard" type="button">Résultats</button>
   <button id="tab-produits" type="button">Produits</button>
+  <button id="tab-investissements" type="button">Invest.</button>
   <button id="tab-settings" type="button">Paramètres</button>
 </nav>
+
+<div id="help-modal" class="help-modal" style="display:none">
+  <div class="help-modal-box">
+    <div class="help-modal-header">
+      <div id="help-modal-title" class="ticket-title"></div>
+      <button type="button" id="help-modal-close" class="help-modal-close">×</button>
+    </div>
+    <div id="help-modal-body" class="help-modal-body"></div>
+  </div>
+</div>
 
 <script src="app.js"></script>
 </body>
