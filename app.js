@@ -8,6 +8,7 @@ const KEYS = {
   ingredients: "benefice-snack:ingredients",
   products: "benefice-snack:products",
   investissements: "benefice-snack:investissements",
+  modeNespresso: "benefice-snack:modeNespresso",
   pendingSync: "benefice-snack:pendingSync",
   seeded: "benefice-snack:seeded"
 };
@@ -94,6 +95,24 @@ L'app répartit alors automatiquement le coût sur la durée indiquée et l'int�
 Si le montant payé est <b>inférieur à 500 €</b> (ex. un petit ustensile, une petite friteuse d'appoint), l'app ne l'étale <b>pas</b> sur plusieurs années. Elle déduit le montant <b>en une seule fois</b>, le mois où vous l'avez mis en service — c'est la règle fiscale belge pour le "petit matériel". Peu importe la catégorie choisie dans ce cas : c'est uniquement le montant qui décide. Au-delà de 500 €, l'étalement sur plusieurs années s'applique normalement.
 <br><br>
 ⚠️ Les durées proposées sont "communément admises" mais pas gravées dans le marbre — demandez confirmation à votre comptable, qui peut les ajuster selon le bien réel.`
+  },
+  "nespresso": {
+    titre: "Qu'est-ce que le mode Nespresso ?",
+    corps: `C'est un 2ᵉ mode d'affichage, en plus du calcul complet habituel — un bouton pour basculer de l'un à l'autre, en haut de l'app.
+<br><br>
+En mode Nespresso, le calcul est volontairement très simple :<br>
+<b>Bénéfice = prix de vente payé par le client − prix d'achat payé au fournisseur</b>, tel quel, sans rien retirer d'autre.
+<br><br>
+Concrètement, ce mode <b>ignore complètement</b> :<br>
+- la TVA (ni sur les ventes, ni sur les achats)<br>
+- les charges fixes (loyer, énergie...)<br>
+- l'amortissement des investissements<br>
+- les cotisations sociales<br>
+- la provision impôt
+<br><br>
+C'est utile pour voir rapidement "ce qui reste dans la caisse" sur la marchandise seule, sans la comptabilité complète autour. Les mêmes ventes que vous avez saisies sont réutilisées — vous n'avez rien à ressaisir.
+<br><br>
+⚠️ Ce chiffre est <b>toujours plus élevé</b> que le vrai bénéfice net (mode complet), puisque toutes les autres charges réelles de l'activité ne sont pas déduites ici. Ne pas confondre les deux quand vous regardez vos comptes.`
   },
   "provision-impot": {
     titre: "Comment fonctionne la provision impôt",
@@ -436,6 +455,40 @@ function computeDay(entry, settings, products, ingredients) {
 }
 
 /* ============================================================
+   Mode Nespresso — bénéfice brut simplifié (ventes TTC − achats TTC, rien d'autre)
+   ============================================================ */
+function computeDayNespresso(entry, products, ingredients) {
+  const productsById = Object.fromEntries(products.map((p) => [p.id, p]));
+  const lignes = [];
+  let ventesTTCTotal = 0;
+  let coutTotalGlobal = 0;
+
+  (entry.ventes || []).forEach((v) => {
+    const p = productsById[v.productId];
+    if (!p) return;
+    const qteTotal = (v.qteSurPlace || 0) + (v.qteEmporter || 0);
+    if (qteTotal === 0) return;
+
+    const ventesTTC = qteTotal * p.prixVente;
+    const coutUnitaire = coutMatiereUnitaire(p, ingredients);
+    const coutTotal = coutUnitaire * qteTotal;
+    const marge = ventesTTC - coutTotal;
+
+    ventesTTCTotal += ventesTTC;
+    coutTotalGlobal += coutTotal;
+    lignes.push({ productId: p.id, nom: p.nom, qteTotal, ventesTTC, coutTotal, marge });
+  });
+
+  lignes.sort((a, b) => b.marge - a.marge);
+  const beneficeNespresso = ventesTTCTotal - coutTotalGlobal;
+  return { lignes, ventesTTCTotal, coutTotalGlobal, beneficeNespresso };
+}
+
+function isModeNespresso() { return localStorage.getItem(KEYS.modeNespresso) === "1"; }
+function setModeNespresso(on) { localStorage.setItem(KEYS.modeNespresso, on ? "1" : "0"); }
+
+
+/* ============================================================
    Navigation
    ============================================================ */
 function showScreen(name) {
@@ -561,8 +614,35 @@ function handleSaveEntry(evt) {
 }
 
 function renderResult(entry, settings, products, ingredients) {
-  const r = computeDay(entry, settings, products, ingredients);
   const box = document.getElementById("result-box");
+
+  if (isModeNespresso()) {
+    const rn = computeDayNespresso(entry, products, ingredients);
+    const negative = rn.beneficeNespresso < 0;
+    const lignesHtml = rn.lignes.map((l, i) => `
+      <div class="detail-line">
+        <span>${i + 1}. ${l.nom} (${l.qteTotal})</span>
+        <span>${eur(l.marge)}</span>
+      </div>`).join("");
+    box.innerHTML = `
+      <div class="nespresso-banner">Mode Nespresso — bénéfice brut simplifié</div>
+      <div class="stamp-wrap">
+        <div class="stamp ${negative ? "negative" : ""}">
+          <span class="label">Bénéfice Nespresso du ${entry.date}</span>
+          <span class="amount">${eur(rn.beneficeNespresso)}</span>
+        </div>
+      </div>
+      <div class="detail-line"><span>Ventes (prix TTC tel vendu)</span><span>${eur(rn.ventesTTCTotal)}</span></div>
+      <div class="detail-line"><span>Achats matières (coût tel qu'entré)</span><span>-${eur(rn.coutTotalGlobal)}</span></div>
+      <div class="field-note section-gap">Aucune TVA, charge fixe, amortissement, cotisation ou provision impôt n'est prise en compte ici — uniquement ventes moins achats de marchandise.</div>
+      <div class="ticket-title section-gap">Marge par produit</div>
+      ${lignesHtml || '<div class="field-note">Aucune vente saisie.</div>'}
+    `;
+    box.style.display = "block";
+    return;
+  }
+
+  const r = computeDay(entry, settings, products, ingredients);
   const negative = r.beneficeNet < 0;
 
   const lignesHtml = r.lignes.map((l, i) => `
@@ -622,6 +702,7 @@ function renderDashboard() {
   const ingredients = loadIngredients();
   const entries = loadEntries().slice().sort((a, b) => b.date.localeCompare(a.date));
   const list = document.getElementById("dashboard-list");
+  const nespresso = isModeNespresso();
 
   if (entries.length === 0) {
     list.innerHTML = `<div class="empty-state">Aucune saisie pour l'instant.<br>Commencez par l'onglet "Saisie du jour".</div>`;
@@ -629,25 +710,30 @@ function renderDashboard() {
     return;
   }
 
-  const results = entries.map((e) => ({ e, r: computeDay(e, settings, products, ingredients) }));
-  const maxAbs = Math.max(...results.map((x) => Math.abs(x.r.beneficeNet)), 1);
+  const results = entries.map((e) => ({
+    e,
+    benefice: nespresso
+      ? computeDayNespresso(e, products, ingredients).beneficeNespresso
+      : computeDay(e, settings, products, ingredients).beneficeNet
+  }));
+  const maxAbs = Math.max(...results.map((x) => Math.abs(x.benefice)), 1);
 
-  list.innerHTML = results.map(({ e, r }) => {
-    const negative = r.beneficeNet < 0;
-    const widthPct = Math.min(100, (Math.abs(r.beneficeNet) / maxAbs) * 100);
+  list.innerHTML = results.map(({ e, benefice }) => {
+    const negative = benefice < 0;
+    const widthPct = Math.min(100, (Math.abs(benefice) / maxAbs) * 100);
     return `
       <div class="summary-card">
         <div style="flex:1">
           <div class="day">${e.date} ${e.synced ? '<span class="badge ok">OneDrive ✓</span>' : '<span class="badge pending">en attente</span>'}</div>
           <div class="bar-row"><div class="bar-track"><div class="bar-fill ${negative ? "negative" : ""}" style="width:${widthPct}%"></div></div></div>
         </div>
-        <div class="value ${negative ? "negative" : "positive"}">${eur(r.beneficeNet)}</div>
+        <div class="value ${negative ? "negative" : "positive"}">${eur(benefice)}</div>
       </div>`;
   }).join("");
 
   const currentMonth = todayISO().slice(0, 7);
-  const monthTotal = results.filter(({ e }) => e.date.startsWith(currentMonth)).reduce((s, { r }) => s + r.beneficeNet, 0);
-  document.getElementById("dashboard-month-total").textContent = "Cumul du mois : " + eur(monthTotal);
+  const monthTotal = results.filter(({ e }) => e.date.startsWith(currentMonth)).reduce((s, { benefice }) => s + benefice, 0);
+  document.getElementById("dashboard-month-total").textContent = (nespresso ? "Cumul Nespresso du mois : " : "Cumul du mois : ") + eur(monthTotal);
 }
 
 /* ============================================================
@@ -1053,10 +1139,29 @@ function handleRestore() {
 /* ============================================================
    Démarrage
    ============================================================ */
+function updateNespressoToggleUI() {
+  const btn = document.getElementById("nespresso-toggle");
+  const on = isModeNespresso();
+  btn.textContent = "Mode Nespresso : " + (on ? "ON" : "OFF");
+  btn.classList.toggle("active", on);
+}
+
+function currentScreenName() {
+  const active = document.querySelector(".screen.active");
+  return active ? active.id.replace("screen-", "") : "saisie";
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   seedExampleData();
 
   showScreen("saisie");
+  updateNespressoToggleUI();
+
+  document.getElementById("nespresso-toggle").addEventListener("click", () => {
+    setModeNespresso(!isModeNespresso());
+    updateNespressoToggleUI();
+    showScreen(currentScreenName());
+  });
 
   document.getElementById("tab-saisie").addEventListener("click", () => showScreen("saisie"));
   document.getElementById("tab-dashboard").addEventListener("click", () => showScreen("dashboard"));

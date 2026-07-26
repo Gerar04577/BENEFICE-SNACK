@@ -407,3 +407,40 @@ select {
   font-size: 12px;
   padding: 0;
 }
+
+/* ============================================================
+   Mode Nespresso — bouton bascule + bannière
+   ============================================================ */
+.nespresso-toggle {
+  margin-top: 8px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 2px solid var(--green);
+  background: #fff;
+  color: var(--green);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+.nespresso-toggle.active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #fff;
+}
+
+.header-help-btn {
+  margin: 6px 0 0 6px;
+  vertical-align: middle;
+}
+
+.nespresso-banner {
+  background: var(--gold);
+  color: #241F1A;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px;
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
