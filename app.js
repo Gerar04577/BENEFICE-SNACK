@@ -1579,8 +1579,7 @@ function attemptBackgroundSync(reason) {
   if (!settings.webhookUrl) return;
   if (!navigator.onLine) return;
 
-  const payload = {
-    action: "save",
+  const innerData = {
     source: "benefice-snack",
     reason,
     exportedAt: new Date().toISOString(),
@@ -1590,6 +1589,11 @@ function attemptBackgroundSync(reason) {
     ingredients: loadIngredients(),
     products: loadProducts(),
     investissements: loadInvestissements()
+  };
+
+  const payload = {
+    action: "save",
+    data: JSON.stringify(innerData)
   };
 
   fetch(settings.webhookUrl, {
@@ -1629,7 +1633,16 @@ function handleRestore() {
   }
   fetch(settings.webhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "import" }) })
     .then((res) => res.json())
-    .then((data) => {
+    .then((raw) => {
+      // Nouveau format Make.com : { data: "<json string>" }. Ancien format à plat conservé en repli.
+      let data = raw;
+      if (raw && typeof raw.data === "string") {
+        try {
+          data = JSON.parse(raw.data);
+        } catch (e) {
+          data = null;
+        }
+      }
       if (data && (data.entries || data.entriesNespresso)) {
         if (data.entries) saveEntries(data.entries);
         if (data.entriesNespresso) saveEntriesNespresso(data.entriesNespresso);

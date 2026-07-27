@@ -22,9 +22,9 @@ L'app démarre avec 3 sandwichs (Mitraillette/Américain, Jambon-fromage-crudit�
    - Branche **import** : filtre `action = import`
 4. Branche `save` → module **OneDrive → Upload a file** :
    - Choisir/créer le dossier via le picker, ex. `/SAUVEGARDE BENEFICE SNACK`
-   - `File Name` = `Sauvegarde-benefice-snack.json`
-   - `Data` = `toBinary(1 ; base64)` — appliqué au **corps entier reçu du webhook** (pas seulement aux ventes : il contient aussi les réglages, les ingrédients et "Ma carte" — tout doit être sauvegardé pour qu'une restauration soit complète).
-5. Branche `import` → module **OneDrive → Download a file** (le fichier créé à l'étape précédente) puis un module **Webhook response** qui renvoie son contenu en JSON à l'app.
+   - `File Name` = `Sauvegarde-benefice-snack.json` (texte simple, tapé directement — pas de variable à mapper)
+   - `Data` : cliquez dans le champ, activez **Map** (bascule en haut du champ **File**), puis cliquez directement sur la bulle **"1. data"** proposée dans le panneau de droite. Pas de formule à taper (pas de `toBinary`/`toJSON`) : l'app envoie déjà tout (réglages, ventes des deux journaux, ingrédients, "Ma carte", investissements) sous forme de texte JSON dans un seul champ nommé `data` — exactement comme pour Charges et Compteurs.
+5. Branche `import` → module **OneDrive → Download a file** (le fichier créé à l'étape précédente) puis un module **Webhook response** qui renvoie `{"data": <contenu du fichier>}` à l'app (même principe : un seul champ `data` contenant tout le JSON en texte).
 6. Activer le scénario.
 7. Copier l'URL du webhook (celle de l'étape 2) dans l'app, écran **Paramètres → Adresse du webhook Make.com**.
 
@@ -97,3 +97,10 @@ Chaque jour enregistré fige désormais, au moment de la saisie, une **copie com
 
 ### Vérifications effectuées (session la plus récente)
 Immunité rétroactive testée en changeant simultanément loyer (×3), TVA, prix d'un ingrédient (×5) et prix de vente d'un produit (×5) après la saisie d'un jour : le bénéfice affiché de ce jour reste rigoureusement identique. Correction d'un jour (ajout d'une vente) testée après un changement de loyer entre-temps : le calcul continue d'utiliser le loyer figé d'origine, pas le nouveau — vérifié à la fois dans l'interface et par lecture directe du figé stocké. Un nouveau jour créé après le changement utilise bien, lui, les nouveaux paramètres. Rétrocompatibilité vérifiée avec une entrée simulée sans figé (repli correct sur les paramètres actuels, aucun crash des écrans Résultats/Cumuls). Indépendance des figés entre les deux journaux vérifiée (Mode complet garde le prix d'avant un changement, Nespresso saisi après le même changement garde le nouveau prix). Bug corrigé au passage : les champs achats/heures étudiants/charges exceptionnelles ne se rechargeaient pas en revenant corriger un jour déjà saisi — c'est réparé et vérifié. 0 erreur JavaScript sur l'ensemble.
+
+## 11. Format d'envoi Make.com simplifié (correction)
+
+L'app envoyait initialement au webhook plusieurs champs séparés (`settings`, `entries`, `products`...), ce qui obligeait à taper une formule (`toBinary(toJSON(1); base64)`) dans le champ `Data` du module OneDrive — source d'erreurs répétées. L'app envoie désormais un seul champ `data` (texte JSON contenant tout : réglages, les deux journaux de ventes, ingrédients, "Ma carte", investissements), à côté du champ `action` — exactement le même principe que Charges et Compteurs. Résultat : dans Make.com, il suffit d'activer **Map** et de cliquer sur la bulle **"1. data"**, sans rien taper. La restauration (`import`) attend le même format en retour : `{"data": "<contenu JSON en texte>"}`.
+
+### Vérifications effectuées
+Testé en Node.js (sans navigateur) en chargeant le code réel de l'app avec un `fetch` simulé : le corps envoyé contient exactement les clefs `action` et `data`, `data` est bien une chaîne de texte JSON, et son contenu se décompose bien en `source`, `reason`, `exportedAt`, `settings`, `entries`, `entriesNespresso`, `ingredients`, `products`, `investissements` — avec une vente de test bien présente dans `entries`. Test de restauration : une réponse simulée `{"data": "<json>"}` est correctement décodée et ses ventes correctement réinjectées dans le stockage de l'app. Repli conservé si jamais Make renvoyait l'ancien format à plat.
