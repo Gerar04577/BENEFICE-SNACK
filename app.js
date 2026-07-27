@@ -1009,6 +1009,7 @@ function handleSaveEntry(evt) {
   entries.sort((a, b) => a.date.localeCompare(b.date));
   saveCurrentJournal(entries);
   markPendingSync();
+  showSavedMsg("entry-saved-msg");
 
   renderResult(entry, settings, products, ingredients);
   document.getElementById("input-heures-etudiants").value = "";
@@ -1189,6 +1190,7 @@ function handleAddIngredient(evt) {
   list.push({ id: uid(), nom, unite, coutParUnite: cout });
   saveIngredients(list);
   document.getElementById("ingredient-form").reset();
+  showSavedMsg("ingredient-saved-msg");
   renderIngredientsList();
 }
 
@@ -1299,6 +1301,7 @@ function handleSaveProduct(evt) {
   if (idx >= 0) products[idx] = product; else products.push(product);
   saveProducts(products);
   closeProductForm();
+  showSavedMsg("product-saved-msg");
   renderProductsList();
 }
 
@@ -1360,6 +1363,7 @@ function handleAddInvestissement(evt) {
   document.getElementById("inv-nom").value = "";
   document.getElementById("inv-montant").value = "";
   document.getElementById("inv-date").value = "";
+  showSavedMsg("investissement-saved-msg");
   renderInvestissementsList();
 }
 
@@ -1562,8 +1566,15 @@ function handleSaveSettings(evt) {
     webhookUrl: document.getElementById("set-webhook").value.trim()
   };
   saveSettings(settings);
-  document.getElementById("settings-saved-msg").style.display = "block";
-  setTimeout(() => (document.getElementById("settings-saved-msg").style.display = "none"), 2000);
+  showSavedMsg("settings-saved-msg");
+}
+
+/* Affiche un message de confirmation "Enregistré ✓" pendant 2 secondes. */
+function showSavedMsg(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.style.display = "block";
+  setTimeout(() => (el.style.display = "none"), 2000);
 }
 
 /* ============================================================
