@@ -4,6 +4,7 @@
 
 const KEYS = {
   entries: "benefice-snack:entries",
+  entriesNespresso: "benefice-snack:entriesNespresso",
   settings: "benefice-snack:settings",
   ingredients: "benefice-snack:ingredients",
   products: "benefice-snack:products",
@@ -100,9 +101,9 @@ Si le montant payé est <b>inférieur à 500 €</b> (ex. un petit ustensile, un
     titre: "Comment lire les cumuls",
     corps: `Cet écran regroupe les bénéfices déjà saisis, à trois niveaux :
 <br><br>
-<b>Par jour</b> : les 30 derniers jours saisis, avec les deux comptabilités côte à côte (Mode complet et Mode Nespresso) — <b>toujours séparées</b>, jamais additionnées entre elles.<br>
-<b>Par mois calendaire</b> : le total du mois, avec une <b>projection</b> de ce que ça donnerait en fin de mois si le rythme actuel continue (calculée sur les jours calendrier, pas seulement les jours travaillés).<br>
-<b>Par année fiscale</b> : le total de l'année (1er janvier au 31 décembre), avec une projection de fin d'année — disponible seulement une fois janvier terminé, pour avoir un minimum de recul.
+<b>Par jour</b> : les 30 derniers jours saisis, avec les deux journaux côte à côte (Mode complet et Nespresso) — <b>totalement indépendants</b>, jamais additionnés entre eux. Un tiret "—" signifie simplement qu'aucune vente n'a été saisie ce jour-là dans ce journal précis (pas forcément dans l'autre).<br>
+<b>Par mois calendaire</b> : le total du mois pour chaque journal séparément, avec une <b>projection</b> de ce que ça donnerait en fin de mois si le rythme actuel continue (calculée sur les jours calendrier, pas seulement les jours travaillés).<br>
+<b>Par année fiscale</b> : le total de l'année (1er janvier au 31 décembre) pour chaque journal séparément, avec une projection de fin d'année — disponible seulement une fois janvier terminé, pour avoir un minimum de recul.
 <br><br>
 ⚠️ Les projections sont des estimations basées sur la tendance actuelle, pas une garantie — un mois d'été et un mois d'hiver peuvent être très différents.`
   },
@@ -117,22 +118,17 @@ Le classement se base sur la marge par minute de préparation quand le temps est
 Cette analyse s'affiche automatiquement une fois par mois à l'ouverture de l'app, et reste toujours consultable ici.`
   },
   "nespresso": {
-    titre: "Qu'est-ce que le mode Nespresso ?",
-    corps: `C'est un 2ᵉ mode d'affichage, en plus du calcul complet habituel — un bouton pour basculer de l'un à l'autre, en haut de l'app.
+    titre: "Qu'est-ce que le journal Nespresso ?",
+    corps: `C'est un 2ᵉ journal de ventes, complètement SÉPARÉ du Mode complet — un bouton en haut de l'app permet de basculer de l'un à l'autre.
 <br><br>
-En mode Nespresso, le calcul est volontairement très simple :<br>
-<b>Bénéfice = prix de vente payé par le client − prix d'achat payé au fournisseur</b>, tel quel, sans rien retirer d'autre.
+<b>Les deux journaux sont totalement indépendants</b> : les ventes saisies dans l'un n'apparaissent JAMAIS dans l'autre, même à la même date. Saisir 5 sandwichs aujourd'hui dans le Mode complet n'a aucun effet sur le journal Nespresso — il faudrait les saisir une 2ᵉ fois, séparément, si vous voulez qu'ils y apparaissent aussi.
 <br><br>
-Concrètement, ce mode <b>ignore complètement</b> :<br>
-- la TVA (ni sur les ventes, ni sur les achats)<br>
-- les charges fixes (loyer, énergie...)<br>
-- l'amortissement des investissements<br>
-- les cotisations sociales<br>
-- la provision impôt
+Le catalogue de produits et ingrédients (Ma carte, Matières premières) reste le même dans les deux — seules les <b>ventes du jour</b> sont séparées.
 <br><br>
-C'est utile pour voir rapidement "ce qui reste dans la caisse" sur la marchandise seule, sans la comptabilité complète autour. Les mêmes ventes que vous avez saisies sont réutilisées — vous n'avez rien à ressaisir.
+En journal Nespresso, le calcul est volontairement très simple :<br>
+<b>Bénéfice = prix de vente payé par le client − coût des ingrédients de la recette</b>, tel quel, sans rien retirer d'autre — pas de TVA, pas de charges fixes, pas d'amortissement, pas de cotisations, pas de provision impôt. C'est pour ça que les champs "heures étudiants", "achats matières" et "charges exceptionnelles" disparaissent de la saisie dans ce journal : ils ne servent à rien ici.
 <br><br>
-⚠️ Ce chiffre est <b>toujours plus élevé</b> que le vrai bénéfice net (mode complet), puisque toutes les autres charges réelles de l'activité ne sont pas déduites ici. Ne pas confondre les deux quand vous regardez vos comptes.`
+⚠️ Ce chiffre ne doit jamais être confondu avec le vrai bénéfice net du Mode complet — ce sont deux comptabilités différentes, avec des ventes différentes.`
   },
   "provision-impot": {
     titre: "Comment fonctionne la provision impôt",
@@ -174,6 +170,13 @@ function saveSettings(s) { saveJSON(KEYS.settings, s); }
 
 function loadEntries() { return loadJSON(KEYS.entries, []); }
 function saveEntries(e) { saveJSON(KEYS.entries, e); }
+function loadEntriesNespresso() { return loadJSON(KEYS.entriesNespresso, []); }
+function saveEntriesNespresso(e) { saveJSON(KEYS.entriesNespresso, e); }
+
+// Journal actif selon le mode en cours (Mode complet ou Mode Nespresso) — utilisé partout
+// où l'écran doit refléter "ce qu'on est en train de remplir en ce moment".
+function loadCurrentJournal() { return isModeNespresso() ? loadEntriesNespresso() : loadEntries(); }
+function saveCurrentJournal(list) { isModeNespresso() ? saveEntriesNespresso(list) : saveEntries(list); }
 
 function loadIngredients() { return loadJSON(KEYS.ingredients, []); }
 function saveIngredients(list) { saveJSON(KEYS.ingredients, list); }
@@ -309,10 +312,18 @@ function todayISO() { return new Date().toISOString().slice(0, 10); }
 function eur(n) {
   return (Math.round((n || 0) * 100) / 100).toLocaleString("fr-BE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
+function eurOuTiret(n) { return n == null ? "—" : eur(n); }
+// Affichage de date au format JJ/MM/AAAA, indépendamment des réglages régionaux du téléphone.
+function formatDateFR(dateStr) {
+  if (!dateStr || dateStr.length < 10) return dateStr || "";
+  return `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}/${dateStr.slice(0, 4)}`;
+}
 
 /* ============================================================
-   Cumuls (jour / mois / année fiscale) — deux comptabilités
-   toujours calculées séparément, jamais mélangées.
+   Cumuls (jour / mois / année fiscale) — deux journaux de ventes
+   totalement indépendants (Mode complet / Mode Nespresso).
+   Une même date peut exister dans un journal, dans l'autre, dans
+   les deux, ou dans aucun — sans aucun lien entre les deux.
    ============================================================ */
 function joursDansMois(annee, mois1a12) {
   return new Date(annee, mois1a12, 0).getDate(); // mois1a12 : 1=janvier
@@ -326,26 +337,32 @@ function jourDeLAnnee(dateStr) {
   return Math.floor((d - debut) / 86400000) + 1;
 }
 
-// Calcule, pour chaque jour saisi, le bénéfice dans les deux comptabilités.
-function computeAllDaily(products, ingredients, settings) {
-  const entries = loadEntries().slice().sort((a, b) => a.date.localeCompare(b.date));
-  return entries.map((e) => ({
-    date: e.date,
-    complet: computeDay(e, settings, products, ingredients).beneficeNet,
-    nespresso: computeDayNespresso(e, products, ingredients).beneficeNespresso
-  }));
+// Calcule, pour chaque jour saisi d'UN journal donné, le bénéfice (fonction de calcul fournie).
+function computeAllDailyPourJournal(entries, computeFn) {
+  return entries.slice().sort((a, b) => a.date.localeCompare(b.date)).map((e) => ({ date: e.date, valeur: computeFn(e) }));
 }
 
-// Regroupe une liste { date, complet, nespresso } par mois ("YYYY-MM") ou par année ("YYYY").
-function regrouperPar(daily, longueurCle) {
+// Regroupe une liste { date, valeur } d'UN SEUL journal par mois ("YYYY-MM") ou année ("YYYY").
+function regrouperUn(daily, longueurCle) {
   const map = new Map();
   daily.forEach((d) => {
     const cle = d.date.slice(0, longueurCle);
-    if (!map.has(cle)) map.set(cle, { cle, complet: 0, nespresso: 0, dates: [] });
+    if (!map.has(cle)) map.set(cle, { cle, total: 0, dates: [] });
     const g = map.get(cle);
-    g.complet += d.complet;
-    g.nespresso += d.nespresso;
+    g.total += d.valeur;
     g.dates.push(d.date);
+  });
+  return Array.from(map.values()).sort((a, b) => b.cle.localeCompare(a.cle));
+}
+
+// Fusionne deux regroupements indépendants (complet / nespresso) par clé, pour l'affichage
+// côte à côte — sans jamais mélanger les totaux entre eux.
+function fusionnerParCle(groupesComplet, groupesNespresso) {
+  const map = new Map();
+  groupesComplet.forEach((g) => map.set(g.cle, { cle: g.cle, complet: g.total, datesComplet: g.dates, nespresso: null, datesNespresso: [] }));
+  groupesNespresso.forEach((g) => {
+    if (!map.has(g.cle)) map.set(g.cle, { cle: g.cle, complet: null, datesComplet: [], nespresso: g.total, datesNespresso: g.dates });
+    else { const e = map.get(g.cle); e.nespresso = g.total; e.datesNespresso = g.dates; }
   });
   return Array.from(map.values()).sort((a, b) => b.cle.localeCompare(a.cle));
 }
@@ -357,52 +374,67 @@ function projeter(cumul, joursEcoules, joursTotal) {
 }
 
 function buildCumuls(products, ingredients, settings) {
-  const daily = computeAllDaily(products, ingredients, settings);
-  const mois = regrouperPar(daily, 7);   // "YYYY-MM"
-  const annees = regrouperPar(daily, 4); // "YYYY"
+  const entriesComplet = loadEntries();
+  const entriesNespresso = loadEntriesNespresso();
+  const dailyComplet = computeAllDailyPourJournal(entriesComplet, (e) => computeDay(e, settings, products, ingredients).beneficeNet);
+  const dailyNespresso = computeAllDailyPourJournal(entriesNespresso, (e) => computeDayNespresso(e, products, ingredients).beneficeNespresso);
+
+  const daily = fusionnerParCle(
+    dailyComplet.map((d) => ({ cle: d.date, total: d.valeur, dates: [d.date] })),
+    dailyNespresso.map((d) => ({ cle: d.date, total: d.valeur, dates: [d.date] }))
+  ).map((d) => ({ date: d.cle, complet: d.complet, nespresso: d.nespresso }));
+
+  const moisFusion = fusionnerParCle(regrouperUn(dailyComplet, 7), regrouperUn(dailyNespresso, 7));
+  const anneesFusion = fusionnerParCle(regrouperUn(dailyComplet, 4), regrouperUn(dailyNespresso, 4));
+
   const today = todayISO();
   const [anneeAuj, moisAuj] = [parseInt(today.slice(0, 4), 10), parseInt(today.slice(5, 7), 10)];
 
-  const moisAvecProjection = mois.map((m) => {
+  const moisAvecProjection = moisFusion.map((m) => {
     const [a, mo] = m.cle.split("-").map((x) => parseInt(x, 10));
     const total = joursDansMois(a, mo);
     const estMoisEnCours = a === anneeAuj && mo === moisAuj;
-    const dernierJourDonnee = Math.max(...m.dates.map((d) => parseInt(d.slice(8, 10), 10)));
-    const ecoule = estMoisEnCours ? Math.max(parseInt(today.slice(8, 10), 10), dernierJourDonnee) : total;
+    const ecouleComplet = (estMoisEnCours && m.datesComplet.length) ? Math.max(parseInt(today.slice(8, 10), 10), ...m.datesComplet.map((d) => parseInt(d.slice(8, 10), 10))) : total;
+    const ecouleNespresso = (estMoisEnCours && m.datesNespresso.length) ? Math.max(parseInt(today.slice(8, 10), 10), ...m.datesNespresso.map((d) => parseInt(d.slice(8, 10), 10))) : total;
     return {
       ...m,
-      joursEcoules: ecoule,
       joursTotal: total,
-      estComplet: !estMoisEnCours,
-      projectionComplet: estMoisEnCours ? projeter(m.complet, ecoule, total) : null,
-      projectionNespresso: estMoisEnCours ? projeter(m.nespresso, ecoule, total) : null
+      estMoisEnCours,
+      projectionComplet: (estMoisEnCours && m.complet != null) ? projeter(m.complet, ecouleComplet, total) : null,
+      projectionNespresso: (estMoisEnCours && m.nespresso != null) ? projeter(m.nespresso, ecouleNespresso, total) : null,
+      joursEcoulesComplet: ecouleComplet,
+      joursEcoulesNespresso: ecouleNespresso
     };
   });
 
-  const anneesAvecProjection = annees.map((y) => {
+  const anneesAvecProjection = anneesFusion.map((y) => {
     const a = parseInt(y.cle, 10);
     const total = joursDansAnnee(a);
     const estAnneeEnCours = a === anneeAuj;
-    const dernierJourDonnee = Math.max(...y.dates.map((d) => jourDeLAnnee(d)));
-    const ecoule = estAnneeEnCours ? Math.max(jourDeLAnnee(today), dernierJourDonnee) : total;
-    // Projection annuelle uniquement disponible une fois le premier mois calendaire écoulé.
     const premierMoisEcoule = estAnneeEnCours ? moisAuj > 1 : true;
+    const ecouleComplet = (estAnneeEnCours && y.datesComplet.length) ? Math.max(jourDeLAnnee(today), ...y.datesComplet.map(jourDeLAnnee)) : total;
+    const ecouleNespresso = (estAnneeEnCours && y.datesNespresso.length) ? Math.max(jourDeLAnnee(today), ...y.datesNespresso.map(jourDeLAnnee)) : total;
+    const projectionDisponible = estAnneeEnCours && premierMoisEcoule;
     return {
       ...y,
-      joursEcoules: ecoule,
       joursTotal: total,
-      estComplete: !estAnneeEnCours,
-      projectionDisponible: estAnneeEnCours && premierMoisEcoule,
-      projectionComplet: (estAnneeEnCours && premierMoisEcoule) ? projeter(y.complet, ecoule, total) : null,
-      projectionNespresso: (estAnneeEnCours && premierMoisEcoule) ? projeter(y.nespresso, ecoule, total) : null
+      estAnneeEnCours,
+      projectionDisponible,
+      projectionComplet: (projectionDisponible && y.complet != null) ? projeter(y.complet, ecouleComplet, total) : null,
+      projectionNespresso: (projectionDisponible && y.nespresso != null) ? projeter(y.nespresso, ecouleNespresso, total) : null,
+      joursEcoulesComplet: ecouleComplet,
+      joursEcoulesNespresso: ecouleNespresso
     };
   });
 
-  return { daily: daily.slice().reverse(), mois: moisAvecProjection, annees: anneesAvecProjection };
+  return { daily, mois: moisAvecProjection, annees: anneesAvecProjection };
 }
 
 /* ============================================================
-   Analyse mensuelle des produits (mois calendaire précédent complet)
+   Analyse mensuelle des produits — basée sur le journal Mode complet
+   (marge par minute de préparation la plus significative). Le Mode
+   Nespresso n'a pas d'équivalent : il n'a pas de notion de temps ni
+   de charges à optimiser, seulement ventes − achats.
    ============================================================ */
 function moisPrecedentCle(today) {
   const d = new Date(today + "T00:00:00");
@@ -439,7 +471,7 @@ function analyseMensuelleProduits(moisCle, settings, products, ingredients) {
   const meilleur = liste[0];
   const pire = liste[liste.length - 1];
 
-  let message = `Analyse du mois de ${moisCle} : `;
+  let message = `Analyse du mois de ${moisCle} (Mode complet) : `;
   if (liste.length > 1 && meilleur !== pire) {
     message += `"${meilleur.nom}" est le produit le plus rentable (${eur(meilleur.margeTotale)} de marge sur le mois${meilleur.margeParMinute != null ? `, ${eur(meilleur.margeParMinute)}/min` : ""}) — à mettre en avant. `;
     if (pire.margeParVente <= 0) {
@@ -756,8 +788,8 @@ function showScreen(name) {
    Écran Saisie
    ============================================================ */
 function getSalesRanking() {
-  // Popularité = quantité totale vendue toute la période, pour trier "Ma carte" à la saisie.
-  const entries = loadEntries();
+  // Popularité = quantité totale vendue toute la période DANS LE JOURNAL ACTIF, pour trier "Ma carte" à la saisie.
+  const entries = loadCurrentJournal();
   const totals = {};
   entries.forEach((e) => (e.ventes || []).forEach((v) => {
     totals[v.productId] = (totals[v.productId] || 0) + (v.qteSurPlace || 0) + (v.qteEmporter || 0);
@@ -769,6 +801,8 @@ let currentEntryDraft = {};
 
 function renderSaisieScreen() {
   document.getElementById("input-date").value = todayISO();
+  document.getElementById("saisie-ticket-title").textContent = "Saisie du jour — Journal : " + (isModeNespresso() ? "Mode Nespresso" : "Mode complet");
+  document.getElementById("champs-complet-only").style.display = isModeNespresso() ? "none" : "block";
   renderProductCounters(todayISO());
   document.getElementById("result-box").style.display = "none";
 }
@@ -781,7 +815,7 @@ function renderProductCounters(date) {
   const totals = getSalesRanking();
   const sorted = products.slice().sort((a, b) => (totals[b.id] || 0) - (totals[a.id] || 0));
 
-  const existing = loadEntries().find((e) => e.date === date);
+  const existing = loadCurrentJournal().find((e) => e.date === date);
   currentEntryDraft = {};
   if (existing) {
     (existing.ventes || []).forEach((v) => (currentEntryDraft[v.productId] = { qteSurPlace: v.qteSurPlace || 0, qteEmporter: v.qteEmporter || 0 }));
@@ -849,11 +883,11 @@ function handleSaveEntry(evt) {
     synced: false
   };
 
-  const entries = loadEntries();
+  const entries = loadCurrentJournal();
   const idx = entries.findIndex((e) => e.date === entry.date);
   if (idx >= 0) entries[idx] = entry; else entries.push(entry);
   entries.sort((a, b) => a.date.localeCompare(b.date));
-  saveEntries(entries);
+  saveCurrentJournal(entries);
   markPendingSync();
 
   renderResult(entry, settings, products, ingredients);
@@ -877,7 +911,7 @@ function renderResult(entry, settings, products, ingredients) {
       <div class="nespresso-banner">Mode Nespresso — bénéfice brut simplifié</div>
       <div class="stamp-wrap">
         <div class="stamp ${negative ? "negative" : ""}">
-          <span class="label">Bénéfice Nespresso du ${entry.date}</span>
+          <span class="label">Bénéfice Nespresso du ${formatDateFR(entry.date)}</span>
           <span class="amount">${eur(rn.beneficeNespresso)}</span>
         </div>
       </div>
@@ -912,7 +946,7 @@ function renderResult(entry, settings, products, ingredients) {
   box.innerHTML = `
     <div class="stamp-wrap">
       <div class="stamp ${negative ? "negative" : ""}">
-        <span class="label">Bénéfice net du ${entry.date}</span>
+        <span class="label">Bénéfice net du ${formatDateFR(entry.date)}</span>
         <span class="amount">${eur(r.beneficeNet)}</span>
       </div>
     </div>
@@ -949,12 +983,13 @@ function renderDashboard() {
   const settings = loadSettings();
   const products = loadProducts();
   const ingredients = loadIngredients();
-  const entries = loadEntries().slice().sort((a, b) => b.date.localeCompare(a.date));
-  const list = document.getElementById("dashboard-list");
   const nespresso = isModeNespresso();
+  const entries = loadCurrentJournal().slice().sort((a, b) => b.date.localeCompare(a.date));
+  const list = document.getElementById("dashboard-list");
+  document.getElementById("dashboard-ticket-title").textContent = "Historique — Journal : " + (nespresso ? "Mode Nespresso" : "Mode complet");
 
   if (entries.length === 0) {
-    list.innerHTML = `<div class="empty-state">Aucune saisie pour l'instant.<br>Commencez par l'onglet "Saisie du jour".</div>`;
+    list.innerHTML = `<div class="empty-state">Aucune saisie pour l'instant dans ce journal.<br>Commencez par l'onglet "Saisie du jour".</div>`;
     document.getElementById("dashboard-month-total").textContent = "";
     return;
   }
@@ -973,7 +1008,7 @@ function renderDashboard() {
     return `
       <div class="summary-card">
         <div style="flex:1">
-          <div class="day">${e.date} ${e.synced ? '<span class="badge ok">OneDrive ✓</span>' : '<span class="badge pending">en attente</span>'}</div>
+          <div class="day">${formatDateFR(e.date)} ${e.synced ? '<span class="badge ok">OneDrive ✓</span>' : '<span class="badge pending">en attente</span>'}</div>
           <div class="bar-row"><div class="bar-track"><div class="bar-fill ${negative ? "negative" : ""}" style="width:${widthPct}%"></div></div></div>
         </div>
         <div class="value ${negative ? "negative" : "positive"}">${eur(benefice)}</div>
@@ -1231,15 +1266,15 @@ function renderCumulsScreen() {
   const ingredients = loadIngredients();
   const c = buildCumuls(products, ingredients, settings);
 
-  // Par jour (les 30 derniers, les deux comptabilités côte à côte)
+  // Par jour (les 30 derniers, les deux journaux côte à côte — "—" si absent d'un journal)
   const jourEl = document.getElementById("cumuls-jour-list");
   if (c.daily.length === 0) {
     jourEl.innerHTML = `<div class="empty-state">Aucune journée saisie.</div>`;
   } else {
     jourEl.innerHTML = c.daily.slice(0, 30).map((d) => `
       <div class="detail-line">
-        <span>${d.date}</span>
-        <span>Complet : ${eur(d.complet)} &nbsp;·&nbsp; Nespresso : ${eur(d.nespresso)}</span>
+        <span>${formatDateFR(d.date)}</span>
+        <span>Complet : ${eurOuTiret(d.complet)} &nbsp;·&nbsp; Nespresso : ${eurOuTiret(d.nespresso)}</span>
       </div>`).join("");
   }
 
@@ -1250,9 +1285,9 @@ function renderCumulsScreen() {
   } else {
     moisEl.innerHTML = c.mois.map((m) => `
       <div class="detail-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
-        <span style="font-weight:600;">${m.cle} ${m.estComplet ? "" : "(en cours — " + m.joursEcoules + "/" + m.joursTotal + " jours)"}</span>
-        <span>Complet : ${eur(m.complet)}${m.projectionComplet != null ? ` (projection fin de mois : ${eur(m.projectionComplet)})` : ""}</span>
-        <span>Nespresso : ${eur(m.nespresso)}${m.projectionNespresso != null ? ` (projection fin de mois : ${eur(m.projectionNespresso)})` : ""}</span>
+        <span style="font-weight:600;">${m.cle}${m.estMoisEnCours ? " (mois en cours)" : ""}</span>
+        <span>Complet : ${eurOuTiret(m.complet)}${m.projectionComplet != null ? ` (projection fin de mois : ${eur(m.projectionComplet)})` : ""}</span>
+        <span>Nespresso : ${eurOuTiret(m.nespresso)}${m.projectionNespresso != null ? ` (projection fin de mois : ${eur(m.projectionNespresso)})` : ""}</span>
       </div>`).join("");
   }
 
@@ -1263,24 +1298,24 @@ function renderCumulsScreen() {
   } else {
     anneeEl.innerHTML = c.annees.map((y) => `
       <div class="detail-line" style="flex-direction:column; align-items:flex-start; gap:2px;">
-        <span style="font-weight:600;">${y.cle} ${y.estComplete ? "" : "(en cours — jour " + y.joursEcoules + "/" + y.joursTotal + ")"}</span>
-        <span>Complet : ${eur(y.complet)}${y.projectionComplet != null ? ` (projection fin d'année : ${eur(y.projectionComplet)})` : ""}</span>
-        <span>Nespresso : ${eur(y.nespresso)}${y.projectionNespresso != null ? ` (projection fin d'année : ${eur(y.projectionNespresso)})` : ""}</span>
-        ${(!y.estComplete && !y.projectionDisponible) ? '<span class="field-note">Projection disponible dès que janvier sera terminé.</span>' : ""}
+        <span style="font-weight:600;">${y.cle}${y.estAnneeEnCours ? " (année en cours)" : ""}</span>
+        <span>Complet : ${eurOuTiret(y.complet)}${y.projectionComplet != null ? ` (projection fin d'année : ${eur(y.projectionComplet)})` : ""}</span>
+        <span>Nespresso : ${eurOuTiret(y.nespresso)}${y.projectionNespresso != null ? ` (projection fin d'année : ${eur(y.projectionNespresso)})` : ""}</span>
+        ${(y.estAnneeEnCours && !y.projectionDisponible) ? '<span class="field-note">Projection disponible dès que janvier sera terminé.</span>' : ""}
       </div>`).join("");
   }
 
   // Graphique jour (les 30 derniers, ordre chronologique croissant pour la courbe)
   const daily30 = c.daily.slice(0, 30).slice().reverse();
-  drawLineChart("chart-jour", daily30.map((d) => d.date.slice(8, 10) + "/" + d.date.slice(5, 7)), daily30.map((d) => d.complet), daily30.map((d) => d.nespresso));
+  drawLineChart("chart-jour", daily30.map((d) => d.date.slice(8, 10) + "/" + d.date.slice(5, 7)), daily30.map((d) => d.complet || 0), daily30.map((d) => d.nespresso || 0));
 
   // Graphique mois (ordre chronologique croissant pour les barres)
   const moisChrono = c.mois.slice().reverse();
-  drawGroupedBarChart("chart-mois", moisChrono.map((m) => m.cle.slice(5, 7) + "/" + m.cle.slice(2, 4)), moisChrono.map((m) => m.complet), moisChrono.map((m) => m.nespresso));
+  drawGroupedBarChart("chart-mois", moisChrono.map((m) => m.cle.slice(5, 7) + "/" + m.cle.slice(2, 4)), moisChrono.map((m) => m.complet || 0), moisChrono.map((m) => m.nespresso || 0));
 
   // Graphique année (ordre chronologique croissant)
   const anneesChrono = c.annees.slice().reverse();
-  drawGroupedBarChart("chart-annee", anneesChrono.map((y) => y.cle), anneesChrono.map((y) => y.complet), anneesChrono.map((y) => y.nespresso));
+  drawGroupedBarChart("chart-annee", anneesChrono.map((y) => y.cle), anneesChrono.map((y) => y.complet || 0), anneesChrono.map((y) => y.nespresso || 0));
 
   renderAnalyseMensuelle(settings, products, ingredients, false);
 }
@@ -1431,6 +1466,7 @@ function attemptBackgroundSync(reason) {
     exportedAt: new Date().toISOString(),
     settings,
     entries: loadEntries(),
+    entriesNespresso: loadEntriesNespresso(),
     ingredients: loadIngredients(),
     products: loadProducts(),
     investissements: loadInvestissements()
@@ -1447,6 +1483,9 @@ function attemptBackgroundSync(reason) {
         const entries = loadEntries();
         entries.forEach((e) => (e.synced = true));
         saveEntries(entries);
+        const entriesN = loadEntriesNespresso();
+        entriesN.forEach((e) => (e.synced = true));
+        saveEntriesNespresso(entriesN);
         clearPendingSync();
       }
     })
@@ -1471,14 +1510,15 @@ function handleRestore() {
   fetch(settings.webhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "import" }) })
     .then((res) => res.json())
     .then((data) => {
-      if (data && data.entries) {
-        saveEntries(data.entries);
+      if (data && (data.entries || data.entriesNespresso)) {
+        if (data.entries) saveEntries(data.entries);
+        if (data.entriesNespresso) saveEntriesNespresso(data.entriesNespresso);
         if (data.settings) saveSettings({ ...DEFAULT_SETTINGS, ...data.settings });
         if (data.ingredients) saveIngredients(data.ingredients);
         if (data.products) saveProducts(data.products);
         if (data.investissements) saveInvestissements(data.investissements);
         clearPendingSync();
-        alert("Historique restauré depuis OneDrive.");
+        alert("Historique restauré depuis OneDrive (les 2 journaux).");
         renderDashboard();
       } else {
         alert("Aucune donnée trouvée sur OneDrive.");
@@ -1493,7 +1533,7 @@ function handleRestore() {
 function updateNespressoToggleUI() {
   const btn = document.getElementById("nespresso-toggle");
   const on = isModeNespresso();
-  btn.textContent = "Mode Nespresso : " + (on ? "ON" : "OFF");
+  btn.textContent = "Journal : " + (on ? "Nespresso" : "Mode complet");
   btn.classList.toggle("active", on);
 }
 
@@ -1511,8 +1551,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("nespresso-toggle").addEventListener("click", () => {
     const activerMaintenant = !isModeNespresso();
     const message = activerMaintenant
-      ? "⚠️ Vous allez ACTIVER le Mode Nespresso.\n\nDans ce mode, le bénéfice affiché ne retire QUE le coût d'achat des produits — aucune TVA, charge fixe, amortissement, cotisation ou impôt n'est déduit. Le chiffre sera plus élevé que le vrai bénéfice net.\n\nConfirmez-vous l'activation ?"
-      : "Vous allez DÉSACTIVER le Mode Nespresso et revenir au calcul complet (avec charges, impôt, etc.).\n\nConfirmez-vous ?";
+      ? "⚠️ Vous allez PASSER SUR LE JOURNAL NESPRESSO.\n\nC'est un journal de ventes complètement SÉPARÉ du Mode complet — les ventes que vous saisirez ici n'apparaîtront jamais dans le Mode complet, et inversement. Le bénéfice affiché ne retire que le coût d'achat des produits, rien d'autre.\n\nConfirmez-vous le passage sur ce journal ?"
+      : "Vous allez REVENIR SUR LE JOURNAL MODE COMPLET (calcul avec charges, impôt, etc.), séparé du journal Nespresso.\n\nConfirmez-vous ?";
     if (!window.confirm(message)) return;
     setModeNespresso(activerMaintenant);
     updateNespressoToggleUI();

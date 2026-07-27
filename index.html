@@ -25,24 +25,26 @@
   <!-- ================= ÉCRAN 1 : SAISIE ================= -->
   <section id="screen-saisie" class="screen">
     <form id="save-form" class="ticket">
-      <div class="ticket-title">Saisie du jour</div>
-      <label for="input-date">Date</label>
+      <div class="ticket-title" id="saisie-ticket-title">Saisie du jour</div>
+      <label for="input-date">Date (JJ/MM/AAAA)</label>
       <input type="date" id="input-date">
 
       <div id="produits-saisie-list"></div>
 
       <div class="section-gap"></div>
-      <label for="input-heures-etudiants">Heures étudiant(s) travaillées aujourd'hui</label>
-      <input type="number" step="0.5" min="0" inputmode="decimal" id="input-heures-etudiants" placeholder="0">
+      <div id="champs-complet-only">
+        <label for="input-heures-etudiants">Heures étudiant(s) travaillées aujourd'hui</label>
+        <input type="number" step="0.5" min="0" inputmode="decimal" id="input-heures-etudiants" placeholder="0">
 
-      <div class="row-split">
-        <div>
-          <label for="input-achats">Achats matières (réel, €)</label>
-          <input type="number" step="0.01" min="0" inputmode="decimal" id="input-achats" placeholder="0,00">
-        </div>
-        <div>
-          <label for="input-charges-except">Charges exceptionnelles (€)</label>
-          <input type="number" step="0.01" min="0" inputmode="decimal" id="input-charges-except" placeholder="0,00">
+        <div class="row-split">
+          <div>
+            <label for="input-achats">Achats matières (réel, €)</label>
+            <input type="number" step="0.01" min="0" inputmode="decimal" id="input-achats" placeholder="0,00">
+          </div>
+          <div>
+            <label for="input-charges-except">Charges exceptionnelles (€)</label>
+            <input type="number" step="0.01" min="0" inputmode="decimal" id="input-charges-except" placeholder="0,00">
+          </div>
         </div>
       </div>
 
@@ -55,7 +57,7 @@
   <!-- ================= ÉCRAN 2 : RÉSULTATS ================= -->
   <section id="screen-dashboard" class="screen">
     <div class="ticket">
-      <div class="ticket-title">Historique</div>
+      <div class="ticket-title" id="dashboard-ticket-title">Historique</div>
       <div id="dashboard-month-total" style="font-weight:600; margin-bottom:10px;"></div>
       <div id="dashboard-list"></div>
     </div>
