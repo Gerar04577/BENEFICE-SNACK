@@ -65,6 +65,73 @@ const CATEGORIES_INVESTISSEMENT = {
 
 // Textes d'aide contextuelle (icône "?") — à destination directe de l'utilisatrice
 const HELP_TEXTS = {
+  "matieres-premieres": {
+    titre: "Comment remplir les matières premières",
+    corps: `C'est la liste de tous vos ingrédients de base — ce que vous achetez chez le fournisseur pour préparer vos produits.
+<br><br>
+<b>Nom</b> : ex. "Jambon cuit".<br>
+<b>Unité</b> : choisissez comment vous l'achetez — au kg, au litre, ou à la pièce (ex. un pain, un œuf).<br>
+<b>Coût par unité</b> : le prix payé au fournisseur pour 1 unité (1 kg, 1 litre, ou 1 pièce) — regardez la vraie facture, pas une estimation.
+<br><br>
+Ces ingrédients servent ensuite à construire les recettes de "Ma carte", pour calculer automatiquement le coût matière de chaque produit vendu.
+<br><br>
+⚠️ Rappel : ces coûts servent surtout au classement "quel produit rapporte le plus" et au calcul du journal Nespresso — pas au bénéfice net du Mode complet, qui se base sur le champ "Achats matières (réel)" saisi chaque jour.`
+  },
+  "ma-carte": {
+    titre: "Comment remplir Ma carte",
+    corps: `C'est la liste des produits que vous vendez réellement au client.
+<br><br>
+<b>Nom</b> : ex. "Mitraillette".<br>
+<b>Type</b> : repas, boisson alcoolisée ou non-alcoolisée — ça détermine automatiquement le bon taux de TVA appliqué.<br>
+<b>Prix de vente</b> : le prix TTC affiché sur votre carte, celui payé par le client.<br>
+<b>Temps de préparation</b> (optionnel) : en minutes — utile pour le classement "marge par minute", qui aide à repérer les produits rapides et rentables.<br>
+<b>Recette</b> : la liste des ingrédients (et quantités) qui composent ce produit — l'app calcule automatiquement le coût matière à partir de ça.
+<br><br>
+Une fois un produit créé, il apparaît directement dans l'écran Saisie.`
+  },
+  "tva": {
+    titre: "Comment fonctionne la TVA dans l'app",
+    corps: `L'app applique automatiquement le bon taux de TVA belge horeca selon le type de produit et le lieu de vente — vous n'avez rien à choisir au moment de la saisie.
+<br><br>
+<b>Repas</b> : 12% sur place, 6% à emporter.<br>
+<b>Boissons alcoolisées</b> : 21%, toujours, peu importe le lieu.<br>
+<b>Boissons non-alcoolisées</b> : 21% sur place, 6% à emporter.
+<br><br>
+Ces taux sont modifiables ici si la réglementation change — mais ⚠️ à faire valider par le comptable avant de les changer, ce sont des taux légaux, pas de simples préférences.`
+  },
+  "onedrive": {
+    titre: "Sauvegarde et restauration OneDrive",
+    corps: `<b>Sauvegarde</b> : automatique, sans bouton à presser — elle se déclenche toute seule quand l'app se ferme ou passe en arrière-plan, et envoie une copie de toutes vos données (les 2 journaux, produits, ingrédients, investissements, paramètres) vers OneDrive via Make.com.
+<br><br>
+<b>Adresse du webhook Make.com</b> : l'adresse technique fournie par Make.com lors de la configuration du scénario — à coller ici une seule fois.
+<br><br>
+<b>Restaurer l'historique depuis OneDrive</b> : ⚠️ action sensible — ça remplace TOUTES les données actuellement sur ce téléphone par la dernière sauvegarde trouvée sur OneDrive. À utiliser uniquement si vous changez d'appareil ou si vous avez perdu des données localement, jamais "juste pour voir".`
+  },
+  "historique-badges": {
+    titre: "Que veulent dire les badges de l'historique",
+    corps: `À côté de chaque date, un petit badge indique si cette journée a bien été envoyée vers OneDrive :
+<br><br>
+<b>"OneDrive ✓"</b> (vert) : cette journée est sauvegardée sur OneDrive, en sécurité même si le téléphone est perdu ou cassé.<br>
+<b>"en attente"</b> : pas encore envoyée — ça arrive normalement tout seul à la prochaine fermeture de l'app avec une connexion internet active, aucune action nécessaire de votre part.
+<br><br>
+Si "en attente" reste affiché longtemps, vérifiez la connexion internet du téléphone, ou que l'adresse du webhook Make.com est bien renseignée dans Paramètres.`
+  },
+  "parametres-figes": {
+    titre: "Corriger une journée / paramètres figés",
+    corps: `<b>Pour corriger une erreur sur un jour déjà saisi :</b><br>
+Tapez sur le champ Date, choisissez le jour à corriger — tout se recharge automatiquement (ventes, achats, heures, charges). Modifiez ce qu'il faut, puis "Enregistrer la journée".
+<br><br>
+⚠️ Vérifiez d'abord que vous êtes sur le <b>bon journal</b> (bouton en haut : Mode complet ou Nespresso) — une même date peut avoir une saisie différente dans chacun.
+<br><br>
+<b>Pourquoi les chiffres d'un jour ancien ne bougent jamais :</b><br>
+Chaque jour enregistré fige, au moment de sa saisie, une photo complète de tout ce qui sert à son calcul : les charges fixes, la TVA, les cotisations, le prix des produits, le coût des ingrédients, les investissements — tout.
+<br><br>
+Résultat : si vous changez un prix ou une charge dans Paramètres <b>après coup</b>, ça ne change <b>jamais</b> le calcul des jours déjà enregistrés. Seuls les nouveaux jours utilisent les valeurs à jour.
+<br><br>
+Et si vous corrigez un jour ancien (ex. ajouter une vente oubliée), la correction réutilise <b>les paramètres figés de ce jour-là</b> — pas ceux d'aujourd'hui — même si vous avez changé des prix entre-temps.
+<br><br>
+C'est voulu : ça reflète la réalité de ce que vous avez vraiment gagné ce jour précis, avec les vrais prix et charges de l'époque.`
+  },
   "charges-fixes": {
     titre: "Comment remplir les charges fixes",
     corps: `Indiquez ici vos frais qui reviennent chaque mois, même les jours où le snack est fermé.

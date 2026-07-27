@@ -25,7 +25,10 @@
   <!-- ================= ÉCRAN 1 : SAISIE ================= -->
   <section id="screen-saisie" class="screen">
     <form id="save-form" class="ticket">
-      <div class="ticket-title" id="saisie-ticket-title">Saisie du jour</div>
+      <div class="ticket-title-row">
+        <div class="ticket-title" id="saisie-ticket-title">Saisie du jour</div>
+        <button type="button" class="help-btn" data-help="parametres-figes">?</button>
+      </div>
       <label for="input-date">Date (JJ/MM/AAAA)</label>
       <input type="date" id="input-date">
 
@@ -57,7 +60,10 @@
   <!-- ================= ÉCRAN 2 : RÉSULTATS ================= -->
   <section id="screen-dashboard" class="screen">
     <div class="ticket">
-      <div class="ticket-title" id="dashboard-ticket-title">Historique</div>
+      <div class="ticket-title-row">
+        <div class="ticket-title" id="dashboard-ticket-title">Historique</div>
+        <button type="button" class="help-btn" data-help="historique-badges">?</button>
+      </div>
       <div id="dashboard-month-total" style="font-weight:600; margin-bottom:10px;"></div>
       <div id="dashboard-list"></div>
     </div>
@@ -107,7 +113,10 @@
   <section id="screen-produits" class="screen">
 
     <div class="ticket">
-      <div class="ticket-title">Matières premières</div>
+      <div class="ticket-title-row">
+        <div class="ticket-title">Matières premières</div>
+        <button type="button" class="help-btn" data-help="matieres-premieres">?</button>
+      </div>
       <form id="ingredient-form">
         <label for="ing-nom">Nom de l'ingrédient</label>
         <input type="text" id="ing-nom" placeholder="ex. Jambon cuit">
@@ -132,7 +141,10 @@
     </div>
 
     <div class="ticket">
-      <div class="ticket-title">Ma carte</div>
+      <div class="ticket-title-row">
+        <div class="ticket-title">Ma carte</div>
+        <button type="button" class="help-btn" data-help="ma-carte">?</button>
+      </div>
       <button type="button" id="add-product-btn" class="primary">Ajouter un produit</button>
       <div class="section-gap"></div>
       <div id="products-list"></div>
@@ -217,7 +229,10 @@
   <!-- ================= ÉCRAN 4 : PARAMÈTRES ================= -->
   <section id="screen-settings" class="screen">
     <form id="settings-form" class="ticket">
-      <div class="ticket-title">TVA — Repas</div>
+      <div class="ticket-title-row">
+        <div class="ticket-title">TVA — Repas</div>
+        <button type="button" class="help-btn" data-help="tva">?</button>
+      </div>
       <div class="row-split">
         <div>
           <label for="set-tva-repas-sp">Sur place (%)</label>
@@ -317,7 +332,10 @@
       <input type="number" step="0.1" id="set-additionnels-communaux">
 
       <div class="section-gap"></div>
-      <div class="ticket-title">Sauvegarde OneDrive</div>
+      <div class="ticket-title-row">
+        <div class="ticket-title">Sauvegarde OneDrive</div>
+        <button type="button" class="help-btn" data-help="onedrive">?</button>
+      </div>
       <label for="set-webhook">Adresse du webhook Make.com</label>
       <input type="text" id="set-webhook" placeholder="https://hook.eu1.make.com/...">
       <div class="field-note">La sauvegarde part automatiquement quand l'app se ferme ou passe en arrière-plan.</div>
