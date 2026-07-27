@@ -84,3 +84,16 @@ Cumuls mensuels/annuels vérifiés avec des données contrôlées (ex. 5 jours �
 
 ### Vérifications effectuées (session précédente)
 Le calcul par tranches a été comparé à un exemple officiel vérifié (revenu imposable 30 000 € → impôt net 6 884,50 €) : résultat identique. Le calcul de la provision marginale lors d'un franchissement de seuil a aussi été vérifié manuellement (352 € sur une tranche de 1 000 € à cheval sur deux paliers). Testé en conditions réelles de navigateur, aucune erreur JS.
+
+## 10. Paramètres figés par journée (changement majeur)
+
+Chaque jour enregistré fige désormais, au moment de la saisie, une **copie complète** de tout ce qui compte pour son calcul : Paramètres (charges fixes, TVA, cotisations, coût étudiant, barème impôt), Produits (prix, recettes), Ingrédients (coûts), Investissements (amortissements).
+
+- **Modifier un prix, une charge fixe, un taux de TVA plus tard ne change plus jamais** le calcul des jours déjà enregistrés — seuls les nouveaux jours utilisent les valeurs actuelles.
+- **Corriger une journée passée** (ex. ajouter une vente oubliée) réutilise le figé original de cette journée — la correction ne porte que sur ce que vous modifiez (ventes, achats, heures, charges exceptionnelles), jamais sur les paramètres qui étaient en vigueur ce jour-là.
+- S'applique aux **deux journaux séparément** (Mode complet et Nespresso) — chacun fige ses propres paramètres au moment de sa propre saisie.
+- **Entrées créées avant cette fonctionnalité** : n'ayant pas de figé (techniquement impossible de le reconstituer), elles continuent d'utiliser les paramètres actuels comme avant — c'est la seule exception.
+- **Coût de stockage** : chaque jour enregistré occupe un peu plus de place (il embarque une copie du catalogue), de l'ordre de quelques Ko/jour — sans impact réel à l'échelle de ce commerce, même sur plusieurs années.
+
+### Vérifications effectuées (session la plus récente)
+Immunité rétroactive testée en changeant simultanément loyer (×3), TVA, prix d'un ingrédient (×5) et prix de vente d'un produit (×5) après la saisie d'un jour : le bénéfice affiché de ce jour reste rigoureusement identique. Correction d'un jour (ajout d'une vente) testée après un changement de loyer entre-temps : le calcul continue d'utiliser le loyer figé d'origine, pas le nouveau — vérifié à la fois dans l'interface et par lecture directe du figé stocké. Un nouveau jour créé après le changement utilise bien, lui, les nouveaux paramètres. Rétrocompatibilité vérifiée avec une entrée simulée sans figé (repli correct sur les paramètres actuels, aucun crash des écrans Résultats/Cumuls). Indépendance des figés entre les deux journaux vérifiée (Mode complet garde le prix d'avant un changement, Nespresso saisi après le même changement garde le nouveau prix). Bug corrigé au passage : les champs achats/heures étudiants/charges exceptionnelles ne se rechargeaient pas en revenant corriger un jour déjà saisi — c'est réparé et vérifié. 0 erreur JavaScript sur l'ensemble.

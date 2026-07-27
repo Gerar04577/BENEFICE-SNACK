@@ -277,6 +277,39 @@ function trancheIndex(revenu, settings) {
 
 const TRANCHE_TAUX_LABELS = (s) => [s.trancheTaux1, s.trancheTaux2, s.trancheTaux3, s.trancheTaux4];
 
+/* ============================================================
+   Paramètres figés par journée ("snapshot")
+   Chaque jour enregistré fige, au moment de la saisie, une copie
+   complète des paramètres, produits, ingrédients et investissements
+   en vigueur ce jour-là. Modifier les Paramètres ou les prix
+   PLUS TARD ne change donc plus jamais le calcul des jours déjà
+   enregistrés — seuls les nouveaux jours utilisent les valeurs
+   actuelles. Les entrées créées avant cette fonctionnalité n'ont
+   pas de snapshot : elles continuent d'utiliser les valeurs
+   actuelles (comportement précédent), faute de mieux.
+   ============================================================ */
+function buildSnapshotParams() {
+  return {
+    settings: loadSettings(),
+    products: loadProducts(),
+    ingredients: loadIngredients(),
+    investissements: loadInvestissements()
+  };
+}
+
+// Retourne les paramètres à utiliser pour CETTE entrée : ceux figés à sa création si
+// disponibles, sinon les paramètres actuels (repli pour les anciennes entrées).
+function resolveParams(entry, liveSettings, liveProducts, liveIngredients, liveInvestissements) {
+  const snap = entry.snapshotParams;
+  if (!snap) return { settings: liveSettings, products: liveProducts, ingredients: liveIngredients, investissements: liveInvestissements };
+  return {
+    settings: { ...DEFAULT_SETTINGS, ...(snap.settings || {}) },
+    products: snap.products || liveProducts,
+    ingredients: snap.ingredients || liveIngredients,
+    investissements: snap.investissements || liveInvestissements
+  };
+}
+
 // Cumul du bénéfice avant impôt depuis le 1er janvier de l'année de `date`, en excluant
 // cette date elle-même (pour connaître le point de départ AVANT le jour en cours).
 function cumulBeneficeAvantImpotDepuisJanvier(dateStr, settings, products, ingredients) {
@@ -287,7 +320,9 @@ function cumulBeneficeAvantImpotDepuisJanvier(dateStr, settings, products, ingre
 
 // Version allégée de computeDay qui ne calcule que le bénéfice avant impôt (utilisée
 // pour reconstruire le cumul annuel sans recalculer toute la structure d'affichage).
-function computeDayBeneficeAvantImpot(entry, settings, products, ingredients) {
+// Utilise les paramètres figés du jour `e` s'ils existent (voir resolveParams).
+function computeDayBeneficeAvantImpot(entry, liveSettings, liveProducts, liveIngredients) {
+  const { settings, products, ingredients, investissements } = resolveParams(entry, liveSettings, liveProducts, liveIngredients, loadInvestissements());
   const productsById = Object.fromEntries(products.map((p) => [p.id, p]));
   let ventesHTTotal = 0;
   (entry.ventes || []).forEach((v) => {
@@ -302,7 +337,7 @@ function computeDayBeneficeAvantImpot(entry, settings, products, ingredients) {
     ventesHTTotal += (qteSurPlace * p.prixVente) / (1 + tauxSP / 100) + (qteEmporter * p.prixVente) / (1 + tauxEmp / 100);
   });
   const chargesFixesJour = totalChargesFixes(settings) / (settings.joursOuvresParMois || 1);
-  const amortissementJour = totalAmortissementMensuel(entry.date, loadInvestissements()) / (settings.joursOuvresParMois || 1);
+  const amortissementJour = totalAmortissementMensuel(entry.date, investissements) / (settings.joursOuvresParMois || 1);
   const cotisationsJour = settings.cotisationsTrimestrielles / (settings.joursOuvresParTrimestre || 1);
   const coutEtudiantsJour = (entry.heuresEtudiants || 0) * settings.coutHoraireEtudiant;
   return ventesHTTotal - (entry.achats || 0) - chargesFixesJour - amortissementJour - cotisationsJour - coutEtudiantsJour - (entry.chargesExceptionnelles || 0);
@@ -665,7 +700,10 @@ function coutMatiereUnitaire(product, ingredients) {
 }
 
 // Calcule le détail d'une journée : ventes HT par produit, marge par produit, totaux.
-function computeDay(entry, settings, products, ingredients) {
+// Utilise les paramètres figés de ce jour-là (settings/products/ingredients/investissements)
+// s'ils existent — sinon replie sur les paramètres actuels (anciennes entrées).
+function computeDay(entry, liveSettings, liveProducts, liveIngredients) {
+  const { settings, products, ingredients, investissements } = resolveParams(entry, liveSettings, liveProducts, liveIngredients, loadInvestissements());
   const productsById = Object.fromEntries(products.map((p) => [p.id, p]));
   const lignes = [];
   let ventesHTTotal = 0;
@@ -699,7 +737,7 @@ function computeDay(entry, settings, products, ingredients) {
   });
 
   const chargesFixesJour = totalChargesFixes(settings) / (settings.joursOuvresParMois || 1);
-  const amortissementJour = totalAmortissementMensuel(entry.date, loadInvestissements()) / (settings.joursOuvresParMois || 1);
+  const amortissementJour = totalAmortissementMensuel(entry.date, investissements) / (settings.joursOuvresParMois || 1);
   const cotisationsJour = settings.cotisationsTrimestrielles / (settings.joursOuvresParTrimestre || 1);
   const coutEtudiantsJour = (entry.heuresEtudiants || 0) * settings.coutHoraireEtudiant;
 
@@ -737,7 +775,8 @@ function computeDay(entry, settings, products, ingredients) {
 /* ============================================================
    Mode Nespresso — bénéfice brut simplifié (ventes TTC − achats TTC, rien d'autre)
    ============================================================ */
-function computeDayNespresso(entry, products, ingredients) {
+function computeDayNespresso(entry, liveProducts, liveIngredients) {
+  const { products, ingredients } = resolveParams(entry, null, liveProducts, liveIngredients, null);
   const productsById = Object.fromEntries(products.map((p) => [p.id, p]));
   const lignes = [];
   let ventesTTCTotal = 0;
@@ -820,6 +859,11 @@ function renderProductCounters(date) {
   if (existing) {
     (existing.ventes || []).forEach((v) => (currentEntryDraft[v.productId] = { qteSurPlace: v.qteSurPlace || 0, qteEmporter: v.qteEmporter || 0 }));
   }
+  // Recharge aussi les autres champs de la journée (sinon une correction de quantité
+  // écraserait silencieusement les achats/heures/charges déjà enregistrés pour ce jour).
+  document.getElementById("input-heures-etudiants").value = existing ? (existing.heuresEtudiants || "") : "";
+  document.getElementById("input-achats").value = existing ? (existing.achats || "") : "";
+  document.getElementById("input-charges-except").value = existing ? (existing.chargesExceptionnelles || "") : "";
 
   const list = document.getElementById("produits-saisie-list");
   if (sorted.length === 0) {
@@ -885,7 +929,16 @@ function handleSaveEntry(evt) {
 
   const entries = loadCurrentJournal();
   const idx = entries.findIndex((e) => e.date === entry.date);
-  if (idx >= 0) entries[idx] = entry; else entries.push(entry);
+  if (idx >= 0) {
+    // Correction d'une journée déjà enregistrée : on garde SES paramètres figés d'origine,
+    // on ne change que ce que l'utilisateur vient de modifier (ventes/achats/heures/charges).
+    entry.snapshotParams = entries[idx].snapshotParams || buildSnapshotParams();
+    entries[idx] = entry;
+  } else {
+    // Nouvelle journée : on fige les paramètres actuels, pour toujours.
+    entry.snapshotParams = buildSnapshotParams();
+    entries.push(entry);
+  }
   entries.sort((a, b) => a.date.localeCompare(b.date));
   saveCurrentJournal(entries);
   markPendingSync();
