@@ -24,8 +24,10 @@ const DEFAULT_SETTINGS = {
   // Charges fixes détaillées (€/mois) — leur somme remplace l'ancien champ unique
   chargeLoyer: 0,
   chargeEnergie: 0,
-  chargeAssurances: 0,
+  chargeAssuranceIncendie: 0,
+  chargeAssuranceAccident: 0,
   chargeComptable: 0,
+  chargeSecretariatSocial: 0,
   chargeAbonnements: 0,
   chargeEntretien: 0,
   chargeTaxesLocales: 0,
@@ -65,6 +67,18 @@ const CATEGORIES_INVESTISSEMENT = {
 
 // Textes d'aide contextuelle (icône "?") — à destination directe de l'utilisatrice
 const HELP_TEXTS = {
+  "livre-journal": {
+    titre: "Livre journal (SPF)",
+    corps: `Génère un document imprimable à recopier sur le livre journal des recettes, pour le SPF Finances.
+<br><br>
+Basé uniquement sur le <b>journal Mode complet</b> (jamais le journal Nespresso). Pour chaque jour, les ventes TTC sont réparties par taux de TVA (12 %, 6 %, 21 %, ou tout autre taux paramétré dans Réglages), avec le total HT et la TVA correspondante — en utilisant les taux de TVA figés au moment de chaque jour, même si vous les avez changés depuis.
+<br><br>
+<b>1) Une seule journée</b> : choisissez une date précise.<br>
+<b>2) Un mois entier</b> : toutes les journées de ce mois, avec un total.<br>
+<b>3) Une période personnalisée</b> : du... au..., selon vos besoins (ex. pour recopier plusieurs semaines d'un coup).
+<br><br>
+Le document s'ouvre dans un nouvel onglet, prêt à imprimer. Sur iPhone, dans l'aperçu d'impression, vous pouvez aussi l'enregistrer en PDF via le bouton de partage.`
+  },
   "matieres-premieres": {
     titre: "Comment remplir les matières premières",
     corps: `C'est la liste de tous vos ingrédients de base — ce que vous achetez chez le fournisseur pour préparer vos produits.
@@ -138,8 +152,10 @@ C'est voulu : ça reflète la réalité de ce que vous avez vraiment gagné ce j
 <br><br>
 <b>Loyer</b> : le loyer mensuel du local (+ charges locatives si séparées).<br>
 <b>Énergie</b> : électricité, gaz et eau ensemble, en moyenne mensuelle.<br>
-<b>Assurances</b> : RC professionnelle, incendie, matériel.<br>
-<b>Comptable / secrétariat social</b> : ce que vous payez chaque mois pour la compta et les cotisations.<br>
+<b>Assurance incendie</b> : prime mensuelle de l'assurance incendie/local.<br>
+<b>Assurance accident de travail</b> : prime mensuelle de l'assurance accident de travail.<br>
+<b>Comptable</b> : honoraires mensuels du comptable.<br>
+<b>Secrétariat social</b> : ce que vous payez chaque mois au secrétariat social.<br>
 <b>Abonnements</b> : logiciel de caisse, téléphone, internet.<br>
 <b>Entretien</b> : nettoyage, enlèvement des déchets/graisses.<br>
 <b>Taxes locales</b> : taxe commune, enseigne, terrasse.<br>
@@ -258,8 +274,10 @@ function saveInvestissements(list) { saveJSON(KEYS.investissements, list); }
    Charges fixes totales (somme des sous-postes)
    ============================================================ */
 function totalChargesFixes(settings) {
-  return (settings.chargeLoyer || 0) + (settings.chargeEnergie || 0) + (settings.chargeAssurances || 0) +
-    (settings.chargeComptable || 0) + (settings.chargeAbonnements || 0) + (settings.chargeEntretien || 0) +
+  return (settings.chargeLoyer || 0) + (settings.chargeEnergie || 0) +
+    (settings.chargeAssuranceIncendie || 0) + (settings.chargeAssuranceAccident || 0) +
+    (settings.chargeComptable || 0) + (settings.chargeSecretariatSocial || 0) +
+    (settings.chargeAbonnements || 0) + (settings.chargeEntretien || 0) +
     (settings.chargeTaxesLocales || 0) + (settings.chargeEmprunt || 0);
 }
 
@@ -837,6 +855,180 @@ function computeDay(entry, liveSettings, liveProducts, liveIngredients) {
   });
 
   return { lignes, ventesHTTotal, chargesFixesJour, amortissementJour, cotisationsJour, coutEtudiantsJour, beneficeAvantImpot, provisionImpot, beneficeNet, changementTranche };
+}
+
+/* ============================================================
+   Livre journal (SPF) — répartition des ventes TTC/HT/TVA par taux, par jour
+   Uniquement basé sur le journal Mode complet. Utilise les taux de TVA figés
+   au moment de chaque jour (comme le reste des calculs de l'app).
+   ============================================================ */
+function ventesParTauxPourJour(entry, settings, products) {
+  const productsById = Object.fromEntries(products.map((p) => [p.id, p]));
+  const parTaux = {};
+  const ajoute = (taux, ttc) => {
+    const key = String(taux);
+    if (!parTaux[key]) parTaux[key] = { taux, ttc: 0, ht: 0 };
+    const ht = ttc / (1 + taux / 100);
+    parTaux[key].ttc += ttc;
+    parTaux[key].ht += ht;
+  };
+  (entry.ventes || []).forEach((v) => {
+    const p = productsById[v.productId];
+    if (!p) return;
+    const qteSP = v.qteSurPlace || 0;
+    const qteEmp = v.qteEmporter || 0;
+    if (qteSP > 0) ajoute(tauxTVA(p.type, "surPlace", settings), qteSP * p.prixVente);
+    if (qteEmp > 0) ajoute(tauxTVA(p.type, "emporter", settings), qteEmp * p.prixVente);
+  });
+  return parTaux;
+}
+
+// Construit les lignes du livre journal (une par jour) pour une plage de dates [dateDebut, dateFin] incluse.
+// N'inclut que les jours du journal Mode complet qui ont une entrée enregistrée dans cette plage.
+function buildLivreJournalRows(dateDebut, dateFin) {
+  const liveSettings = loadSettings();
+  const liveProducts = loadProducts();
+  const liveIngredients = loadIngredients();
+  const liveInvestissements = loadInvestissements();
+  const entries = loadEntries()
+    .filter((e) => e.date >= dateDebut && e.date <= dateFin)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const tauxSet = new Set();
+  const rows = entries.map((entry) => {
+    const { settings, products } = resolveParams(entry, liveSettings, liveProducts, liveIngredients, liveInvestissements);
+    const parTaux = ventesParTauxPourJour(entry, settings, products);
+    Object.values(parTaux).forEach((t) => tauxSet.add(t.taux));
+    return { date: entry.date, parTaux };
+  });
+
+  const tauxColonnes = Array.from(tauxSet).sort((a, b) => b - a);
+  return { rows, tauxColonnes };
+}
+
+function formatDateFRCourt(iso) {
+  return formatDateFR(iso);
+}
+
+// Construit le tableau HTML (sans l'enveloppe <html>) à partir des lignes calculées.
+// Réutilisé à la fois par l'affichage dans l'app et par le document imprimable.
+function generateLivreJournalTableHTML(rows, tauxColonnes) {
+  if (rows.length === 0) {
+    return { tableHtml: `<p>Aucune vente enregistrée (journal Mode complet) sur cette période.</p>`, totalTTC: 0 };
+  }
+
+  const totaux = {};
+  let totalHT = 0, totalTVA = 0, totalTTC = 0;
+
+  const theadCols = tauxColonnes.map((t) => `<th>Ventes ${t}% TTC</th>`).join("");
+  const bodyRows = rows.map((r) => {
+    let ligneHT = 0, ligneTVA = 0, ligneTTC = 0;
+    const cols = tauxColonnes.map((t) => {
+      const v = r.parTaux[String(t)];
+      const ttc = v ? v.ttc : 0;
+      const ht = v ? v.ht : 0;
+      ligneTTC += ttc;
+      ligneHT += ht;
+      ligneTVA += ttc - ht;
+      totaux[t] = (totaux[t] || 0) + ttc;
+      return `<td>${eur(ttc)}</td>`;
+    }).join("");
+    totalHT += ligneHT;
+    totalTVA += ligneTVA;
+    totalTTC += ligneTTC;
+    return `<tr><td>${formatDateFRCourt(r.date)}</td>${cols}<td>${eur(ligneHT)}</td><td>${eur(ligneTVA)}</td><td><b>${eur(ligneTTC)}</b></td></tr>`;
+  }).join("");
+
+  const totalCols = tauxColonnes.map((t) => `<td><b>${eur(totaux[t] || 0)}</b></td>`).join("");
+
+  const tableHtml = `<table class="lj-table">
+    <thead><tr><th>Date</th>${theadCols}<th>Total HT</th><th>Total TVA</th><th>Total TTC</th></tr></thead>
+    <tbody>${bodyRows}</tbody>
+    <tfoot><tr><td>TOTAL</td>${totalCols}<td><b>${eur(totalHT)}</b></td><td><b>${eur(totalTVA)}</b></td><td><b>${eur(totalTTC)}</b></td></tr></tfoot>
+  </table>`;
+
+  return { tableHtml, totalTTC };
+}
+
+// Affiche le livre journal directement dans l'app (pas de nouvelle fenêtre — les PWA
+// installées sur iPhone bloquent ou gèrent mal window.open). Un bouton "Imprimer"
+// séparé permet, en plus, d'ouvrir un aperçu d'impression si souhaité.
+function renderLivreJournalInline(titre, dateDebut, dateFin) {
+  const { rows, tauxColonnes } = buildLivreJournalRows(dateDebut, dateFin);
+  const { tableHtml } = generateLivreJournalTableHTML(rows, tauxColonnes);
+
+  const box = document.getElementById("lj-resultat");
+  box.innerHTML = `
+    <div class="ticket-title">${titre}</div>
+    <div class="lj-table-wrap">${tableHtml}</div>
+    ${rows.length > 0 ? `<button type="button" id="lj-imprimer-btn" class="secondary">Imprimer / Enregistrer en PDF</button>` : ""}
+  `;
+
+  if (rows.length > 0) {
+    document.getElementById("lj-imprimer-btn").addEventListener("click", () => {
+      ouvrirLivreJournalImprimable(titre, dateDebut, dateFin);
+    });
+  }
+}
+
+// Ouvre un document imprimable dans un nouvel onglet — action explicite et séparée,
+// déclenchée uniquement si l'utilisateur clique sur "Imprimer" après avoir consulté.
+function ouvrirLivreJournalImprimable(titre, dateDebut, dateFin) {
+  const { rows, tauxColonnes } = buildLivreJournalRows(dateDebut, dateFin);
+  const { tableHtml } = generateLivreJournalTableHTML(rows, tauxColonnes);
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("Impossible d'ouvrir la fenêtre d'impression (bloquée ?). Vous pouvez toujours consulter le document directement dans l'app.");
+    return;
+  }
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${titre}</title>
+<style>
+  body { font-family: -apple-system, sans-serif; padding: 20px; color: #222; }
+  h2 { margin-bottom: 4px; }
+  .sub { color: #666; margin-bottom: 16px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  thead { background: #eee; }
+  tfoot td { background: #f5f5f5; }
+  @media print { button { display: none; } }
+</style>
+</head>
+<body>
+  <h2>${titre}</h2>
+  <div class="sub">Journal Mode complet uniquement — généré le ${formatDateFRCourt(new Date().toISOString().slice(0, 10))}</div>
+  <button onclick="window.print()">Imprimer / Enregistrer en PDF</button>
+  ${tableHtml}
+</body></html>`;
+
+  win.document.write(html);
+  win.document.close();
+}
+
+function handleLivreJournalJour() {
+  const date = document.getElementById("lj-jour-date").value;
+  if (!date) { alert("Choisissez d'abord une date."); return; }
+  renderLivreJournalInline(`Livre journal — ${formatDateFRCourt(date)}`, date, date);
+}
+
+function handleLivreJournalMois() {
+  const val = document.getElementById("lj-mois-valeur").value; // format "YYYY-MM"
+  if (!val) { alert("Choisissez d'abord un mois."); return; }
+  const [annee, mois] = val.split("-");
+  const dernierJour = new Date(parseInt(annee, 10), parseInt(mois, 10), 0).getDate();
+  const dateDebut = `${val}-01`;
+  const dateFin = `${val}-${String(dernierJour).padStart(2, "0")}`;
+  renderLivreJournalInline(`Livre journal — ${mois}/${annee}`, dateDebut, dateFin);
+}
+
+function handleLivreJournalPeriode() {
+  const debut = document.getElementById("lj-periode-debut").value;
+  const fin = document.getElementById("lj-periode-fin").value;
+  if (!debut || !fin) { alert("Choisissez une date de début et de fin."); return; }
+  if (debut > fin) { alert("La date de début doit être avant la date de fin."); return; }
+  renderLivreJournalInline(`Livre journal — du ${formatDateFRCourt(debut)} au ${formatDateFRCourt(fin)}`, debut, fin);
 }
 
 /* ============================================================
@@ -1496,8 +1688,10 @@ function renderSettingsForm() {
 
   document.getElementById("set-charge-loyer").value = s.chargeLoyer;
   document.getElementById("set-charge-energie").value = s.chargeEnergie;
-  document.getElementById("set-charge-assurances").value = s.chargeAssurances;
+  document.getElementById("set-charge-assurance-incendie").value = s.chargeAssuranceIncendie;
+  document.getElementById("set-charge-assurance-accident").value = s.chargeAssuranceAccident;
   document.getElementById("set-charge-comptable").value = s.chargeComptable;
+  document.getElementById("set-charge-secretariat-social").value = s.chargeSecretariatSocial;
   document.getElementById("set-charge-abonnements").value = s.chargeAbonnements;
   document.getElementById("set-charge-entretien").value = s.chargeEntretien;
   document.getElementById("set-charge-taxes-locales").value = s.chargeTaxesLocales;
@@ -1524,8 +1718,10 @@ function renderSettingsForm() {
 
 function updateChargesFixesTotal() {
   const val = (id) => parseFloat(document.getElementById(id).value) || 0;
-  const total = val("set-charge-loyer") + val("set-charge-energie") + val("set-charge-assurances") +
-    val("set-charge-comptable") + val("set-charge-abonnements") + val("set-charge-entretien") +
+  const total = val("set-charge-loyer") + val("set-charge-energie") +
+    val("set-charge-assurance-incendie") + val("set-charge-assurance-accident") +
+    val("set-charge-comptable") + val("set-charge-secretariat-social") +
+    val("set-charge-abonnements") + val("set-charge-entretien") +
     val("set-charge-taxes-locales") + val("set-charge-emprunt");
   document.getElementById("charges-fixes-total").textContent = eur(total) + " / mois";
 }
@@ -1541,8 +1737,10 @@ function handleSaveSettings(evt) {
 
     chargeLoyer: parseFloat(document.getElementById("set-charge-loyer").value) || 0,
     chargeEnergie: parseFloat(document.getElementById("set-charge-energie").value) || 0,
-    chargeAssurances: parseFloat(document.getElementById("set-charge-assurances").value) || 0,
+    chargeAssuranceIncendie: parseFloat(document.getElementById("set-charge-assurance-incendie").value) || 0,
+    chargeAssuranceAccident: parseFloat(document.getElementById("set-charge-assurance-accident").value) || 0,
     chargeComptable: parseFloat(document.getElementById("set-charge-comptable").value) || 0,
+    chargeSecretariatSocial: parseFloat(document.getElementById("set-charge-secretariat-social").value) || 0,
     chargeAbonnements: parseFloat(document.getElementById("set-charge-abonnements").value) || 0,
     chargeEntretien: parseFloat(document.getElementById("set-charge-entretien").value) || 0,
     chargeTaxesLocales: parseFloat(document.getElementById("set-charge-taxes-locales").value) || 0,
@@ -1734,6 +1932,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("product-form").addEventListener("submit", handleSaveProduct);
   document.getElementById("product-form-cancel").addEventListener("click", closeProductForm);
   document.getElementById("recette-add-btn").addEventListener("click", handleAddRecetteLine);
+
+  document.getElementById("lj-jour-btn").addEventListener("click", handleLivreJournalJour);
+  document.getElementById("lj-mois-btn").addEventListener("click", handleLivreJournalMois);
+  document.getElementById("lj-periode-btn").addEventListener("click", handleLivreJournalPeriode);
 
   initBackgroundSyncTriggers();
 
