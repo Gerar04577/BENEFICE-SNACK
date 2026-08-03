@@ -118,3 +118,12 @@ Le guide simple destiné à Melissa (avec exemples chiffrés : matières premiè
 
 ### Vérifications effectuées (session la plus récente)
 Bouton "Mode d'emploi" testé : ouverture de la modale, titre et contenu complets affichés, calculs de l'exemple ("Fricadelle sauce") vérifiés exacts (coût matière 1,69 €, marge 2,81 €, 62 %), fermeture correcte. Non-régression vérifiée : les autres boutons d'aide existants (ex. "matières premières") continuent de fonctionner normalement après cet ajout. 0 erreur JavaScript.
+
+## 13. Séparation des charges Énergie et Taxes locales (changement majeur)
+
+- **Énergie** séparée en 3 champs distincts : Électricité, Gaz, Eau (au lieu d'un seul champ groupé). Motif : pas de gaz au rez-de-chaussée commercial pour l'instant (peut arriver), et l'eau est gratuite pour l'instant (peut changer) — chaque poste doit pouvoir évoluer indépendamment.
+- **Taxes locales** séparées en 3 champs distincts : Taxe communale, Taxe enseigne, Taxe terrasse — motif : ces taxes arrivent généralement sur des factures séparées.
+- **Rétrocompatibilité** : les journées déjà enregistrées avant ce changement gardent leurs anciens champs figés (`chargeEnergie`, `chargeTaxesLocales`) — le calcul du total détecte automatiquement l'ancien format (nouveaux champs absents) et continue à les additionner correctement, sans perte silencieuse de montant. Les journées créées après ce changement utilisent les nouveaux champs.
+
+### Vérifications effectuées (session la plus récente)
+Les 6 nouveaux champs testés visibles et fonctionnels, anciens champs groupés bien disparus du formulaire. Total en temps réel vérifié exact (1200+150+0+0+40+15+25 = 1430,00 €). Sauvegarde vérifiée avec les bons noms de champs. **Rétrocompatibilité testée directement** : une ancienne journée simulée avec l'ancien format groupé (chargeEnergie=200, chargeTaxesLocales=80, nouveaux champs absents) calcule bien un total de 1280 (1000+200+80), pas 1000 — confirmant qu'aucun montant historique n'est perdu silencieusement. Testé aussi qu'un nouveau settings avec les nouveaux champs explicitement à 0 ignore bien un éventuel ancien champ résiduel (ne le fait pas resurgir par erreur). 0 erreur JavaScript.

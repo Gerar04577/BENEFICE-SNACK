@@ -23,14 +23,18 @@ const DEFAULT_SETTINGS = {
 
   // Charges fixes détaillées (€/mois) — leur somme remplace l'ancien champ unique
   chargeLoyer: 0,
-  chargeEnergie: 0,
+  chargeElectricite: 0,
+  chargeGaz: 0,
+  chargeEau: 0,
   chargeAssuranceIncendie: 0,
   chargeAssuranceAccident: 0,
   chargeComptable: 0,
   chargeSecretariatSocial: 0,
   chargeAbonnements: 0,
   chargeEntretien: 0,
-  chargeTaxesLocales: 0,
+  chargeTaxeCommune: 0,
+  chargeTaxeEnseigne: 0,
+  chargeTaxeTerrasse: 0,
   chargeEmprunt: 0,
 
   joursOuvresParMois: 26,
@@ -201,14 +205,16 @@ C'est voulu : ça reflète la réalité de ce que vous avez vraiment gagné ce j
     corps: `Indiquez ici vos frais qui reviennent chaque mois, même les jours où le snack est fermé.
 <br><br>
 <b>Loyer</b> : le loyer mensuel du local (+ charges locatives si séparées).<br>
-<b>Énergie</b> : électricité, gaz et eau ensemble, en moyenne mensuelle.<br>
+<b>Électricité</b> : facture mensuelle moyenne.<br>
+<b>Gaz</b> : laissez à 0 si le rez-de-chaussée commercial n'a pas de gaz pour l'instant — à remplir si ça change un jour.<br>
+<b>Eau</b> : laissez à 0 tant que c'est gratuit — à remplir si ça change un jour.<br>
 <b>Assurance incendie</b> : prime mensuelle de l'assurance incendie/local.<br>
 <b>Assurance accident de travail</b> : prime mensuelle de l'assurance accident de travail.<br>
 <b>Comptable</b> : honoraires mensuels du comptable.<br>
 <b>Secrétariat social</b> : ce que vous payez chaque mois au secrétariat social.<br>
 <b>Abonnements</b> : logiciel de caisse, téléphone, internet.<br>
 <b>Entretien</b> : nettoyage, enlèvement des déchets/graisses.<br>
-<b>Taxes locales</b> : taxe commune, enseigne, terrasse.<br>
+<b>Taxe communale</b>, <b>Taxe enseigne</b>, <b>Taxe terrasse</b> : séparées car elles arrivent généralement sur des factures distinctes.<br>
 <b>Remboursement d'emprunt</b> : mensualité si un crédit a servi à financer le matériel ou le local.
 <br><br>
 Le total est calculé automatiquement et utilisé pour répartir ces frais sur chaque jour ouvré du mois.`
@@ -324,11 +330,21 @@ function saveInvestissements(list) { saveJSON(KEYS.investissements, list); }
    Charges fixes totales (somme des sous-postes)
    ============================================================ */
 function totalChargesFixes(settings) {
-  return (settings.chargeLoyer || 0) + (settings.chargeEnergie || 0) +
+  // Repli sur les anciens champs groupes (chargeEnergie / chargeTaxesLocales) pour les
+  // journees deja figees AVANT la separation en sous-postes — sinon leur total historique
+  // perdrait silencieusement ces montants. Une journee figee APRES la separation a toujours
+  // les nouveaux champs definis (meme a 0), donc le test "!= null" distingue bien les deux cas.
+  const energie = (settings.chargeElectricite != null || settings.chargeGaz != null || settings.chargeEau != null)
+    ? (settings.chargeElectricite || 0) + (settings.chargeGaz || 0) + (settings.chargeEau || 0)
+    : (settings.chargeEnergie || 0);
+  const taxesLocales = (settings.chargeTaxeCommune != null || settings.chargeTaxeEnseigne != null || settings.chargeTaxeTerrasse != null)
+    ? (settings.chargeTaxeCommune || 0) + (settings.chargeTaxeEnseigne || 0) + (settings.chargeTaxeTerrasse || 0)
+    : (settings.chargeTaxesLocales || 0);
+  return (settings.chargeLoyer || 0) + energie +
     (settings.chargeAssuranceIncendie || 0) + (settings.chargeAssuranceAccident || 0) +
     (settings.chargeComptable || 0) + (settings.chargeSecretariatSocial || 0) +
     (settings.chargeAbonnements || 0) + (settings.chargeEntretien || 0) +
-    (settings.chargeTaxesLocales || 0) + (settings.chargeEmprunt || 0);
+    taxesLocales + (settings.chargeEmprunt || 0);
 }
 
 /* ============================================================
@@ -1918,14 +1934,18 @@ function renderSettingsForm() {
   document.getElementById("set-tva-nonalcool-emp").value = s.tvaNonAlcoolEmporter;
 
   document.getElementById("set-charge-loyer").value = s.chargeLoyer;
-  document.getElementById("set-charge-energie").value = s.chargeEnergie;
+  document.getElementById("set-charge-electricite").value = s.chargeElectricite;
+  document.getElementById("set-charge-gaz").value = s.chargeGaz;
+  document.getElementById("set-charge-eau").value = s.chargeEau;
   document.getElementById("set-charge-assurance-incendie").value = s.chargeAssuranceIncendie;
   document.getElementById("set-charge-assurance-accident").value = s.chargeAssuranceAccident;
   document.getElementById("set-charge-comptable").value = s.chargeComptable;
   document.getElementById("set-charge-secretariat-social").value = s.chargeSecretariatSocial;
   document.getElementById("set-charge-abonnements").value = s.chargeAbonnements;
   document.getElementById("set-charge-entretien").value = s.chargeEntretien;
-  document.getElementById("set-charge-taxes-locales").value = s.chargeTaxesLocales;
+  document.getElementById("set-charge-taxe-commune").value = s.chargeTaxeCommune;
+  document.getElementById("set-charge-taxe-enseigne").value = s.chargeTaxeEnseigne;
+  document.getElementById("set-charge-taxe-terrasse").value = s.chargeTaxeTerrasse;
   document.getElementById("set-charge-emprunt").value = s.chargeEmprunt;
   updateChargesFixesTotal();
 
@@ -1949,11 +1969,13 @@ function renderSettingsForm() {
 
 function updateChargesFixesTotal() {
   const val = (id) => parseFloat(document.getElementById(id).value) || 0;
-  const total = val("set-charge-loyer") + val("set-charge-energie") +
+  const total = val("set-charge-loyer") +
+    val("set-charge-electricite") + val("set-charge-gaz") + val("set-charge-eau") +
     val("set-charge-assurance-incendie") + val("set-charge-assurance-accident") +
     val("set-charge-comptable") + val("set-charge-secretariat-social") +
     val("set-charge-abonnements") + val("set-charge-entretien") +
-    val("set-charge-taxes-locales") + val("set-charge-emprunt");
+    val("set-charge-taxe-commune") + val("set-charge-taxe-enseigne") + val("set-charge-taxe-terrasse") +
+    val("set-charge-emprunt");
   document.getElementById("charges-fixes-total").textContent = eur(total) + " / mois";
 }
 
@@ -1967,14 +1989,18 @@ function handleSaveSettings(evt) {
     tvaNonAlcoolEmporter: parseFloat(document.getElementById("set-tva-nonalcool-emp").value) || 0,
 
     chargeLoyer: parseFloat(document.getElementById("set-charge-loyer").value) || 0,
-    chargeEnergie: parseFloat(document.getElementById("set-charge-energie").value) || 0,
+    chargeElectricite: parseFloat(document.getElementById("set-charge-electricite").value) || 0,
+    chargeGaz: parseFloat(document.getElementById("set-charge-gaz").value) || 0,
+    chargeEau: parseFloat(document.getElementById("set-charge-eau").value) || 0,
     chargeAssuranceIncendie: parseFloat(document.getElementById("set-charge-assurance-incendie").value) || 0,
     chargeAssuranceAccident: parseFloat(document.getElementById("set-charge-assurance-accident").value) || 0,
     chargeComptable: parseFloat(document.getElementById("set-charge-comptable").value) || 0,
     chargeSecretariatSocial: parseFloat(document.getElementById("set-charge-secretariat-social").value) || 0,
     chargeAbonnements: parseFloat(document.getElementById("set-charge-abonnements").value) || 0,
     chargeEntretien: parseFloat(document.getElementById("set-charge-entretien").value) || 0,
-    chargeTaxesLocales: parseFloat(document.getElementById("set-charge-taxes-locales").value) || 0,
+    chargeTaxeCommune: parseFloat(document.getElementById("set-charge-taxe-commune").value) || 0,
+    chargeTaxeEnseigne: parseFloat(document.getElementById("set-charge-taxe-enseigne").value) || 0,
+    chargeTaxeTerrasse: parseFloat(document.getElementById("set-charge-taxe-terrasse").value) || 0,
     chargeEmprunt: parseFloat(document.getElementById("set-charge-emprunt").value) || 0,
 
     joursOuvresParMois: parseFloat(document.getElementById("set-jours-mois").value) || 26,
