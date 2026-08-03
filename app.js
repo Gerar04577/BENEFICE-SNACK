@@ -67,6 +67,56 @@ const CATEGORIES_INVESTISSEMENT = {
 
 // Textes d'aide contextuelle (icône "?") — à destination directe de l'utilisatrice
 const HELP_TEXTS = {
+  "mode-emploi": {
+    titre: "Mode d'emploi simple",
+    corps: `<b>1. Les "Matières premières" — le prix de ce que vous achetez</b>
+<br><br>
+Pour chaque ingrédient : le <b>nom</b>, l'<b>unité</b> (pièce, kg, ou litre), et le <b>coût</b> — ce que vous payez pour une seule unité.
+<br><br>
+<i>Exemple :</i> vous achetez un sac de frites de 10 kg pour 15 €. Le coût à indiquer n'est pas 15 €, mais <b>1,50 €/kg</b> (15 € ÷ 10 kg).
+<br><br>
+<table style="width:100%; border-collapse:collapse;">
+<tr><td>Pain baguette</td><td>pièce</td><td>0,40 €</td></tr>
+<tr><td>Fricadelle</td><td>pièce</td><td>0,90 €</td></tr>
+<tr><td>Frites surgelées</td><td>kg</td><td>1,50 €</td></tr>
+<tr><td>Sauce (bidon)</td><td>litre</td><td>3,00 €</td></tr>
+</table>
+<br>
+<b>2. "Ma carte" — vos produits vendus, et leur recette</b>
+<br><br>
+Pour chaque produit : le <b>prix de vente</b>, et la <b>recette</b> — quels ingrédients, en quelle quantité, entrent dans une portion.
+<br><br>
+<i>Exemple : "Fricadelle sauce"</i><br>
+Pain 1 pièce × 0,40 € = 0,40 €<br>
+Fricadelle 1 pièce × 0,90 € = 0,90 €<br>
+Frites 0,2 kg × 1,50 €/kg = 0,30 €<br>
+Sauce 0,03 l × 3,00 €/l = 0,09 €<br>
+<b>Total coût matière = 1,69 €</b>
+<br><br>
+Si ce produit se vend 4,50 €, l'app affiche : <b>Vente 4,50 € · Coût matière 1,69 € · Marge indicative 2,81 € (62%)</b>.
+<br><br>
+62% veut dire : sur 100 € de vente de ce produit, il reste 62 € une fois la matière première payée.
+<br><br>
+⚠️ Si le chiffre est en <b style="color:var(--rust)">rouge</b>, la marge est nulle ou négative — ce produit coûte plus cher à préparer qu'il ne rapporte. À corriger en priorité.
+<br><br>
+<b>3. Où trouver le prix à indiquer</b>
+<br><br>
+La plupart du temps, vous connaissez déjà le prix (ticket de caisse, facture, ou ce que vous a dit le fournisseur) : ouvrez <b>Produits → Matières premières</b> et saisissez-le à la main.
+<br><br>
+<b>4. L'alerte "Prix de vente à revoir ?"</b>
+<br><br>
+Dès qu'un prix d'ingrédient déjà connu change, une alerte apparaît automatiquement, listant chaque produit concerné avec sa marge avant et après :
+<br><br>
+<i>💡 Prix de vente à revoir ? — Fricadelle sauce — marge 2,81 € → 2,51 € (−0,30 €)</i>
+<br><br>
+C'est le bon moment pour se demander : faut-il augmenter le prix de vente, ou accepter de gagner un peu moins sur ce produit ?
+<br><br>
+<b>5. Résumé — les 3 réflexes à avoir</b>
+<br><br>
+1) Un prix qui change → mettez à jour "Matières premières".<br>
+2) Une alerte "Prix de vente à revoir ?" apparaît → décidez si le prix de vente doit changer.<br>
+3) Un chiffre en <b style="color:var(--rust)">rouge</b> dans "Ma carte" → ce produit ne rapporte rien (ou pire) — à corriger sans attendre.`
+  },
   "livre-journal": {
     titre: "Livre journal (SPF)",
     corps: `Génère un document imprimable à recopier sur le livre journal des recettes, pour le SPF Finances.
@@ -1378,12 +1428,191 @@ function handleAddIngredient(evt) {
   const unite = document.getElementById("ing-unite").value;
   const cout = parseFloat(document.getElementById("ing-cout").value) || 0;
   if (!nom) return;
-  const list = loadIngredients();
-  list.push({ id: uid(), nom, unite, coutParUnite: cout });
-  saveIngredients(list);
+  const { ingredient, ancienCout, estNouveau } = mettreAJourOuAjouterIngredient(nom, unite, cout);
   document.getElementById("ingredient-form").reset();
   showSavedMsg("ingredient-saved-msg");
   renderIngredientsList();
+  renderProductsList();
+  const zoneAlerte = document.getElementById("ingredient-impact-alerte");
+  if (!estNouveau && ancienCout !== cout) {
+    const impacts = produitsImpactesParIngredient(ingredient.id, ancienCout);
+    zoneAlerte.innerHTML = htmlAlerteImpactPrix(impacts);
+  } else {
+    zoneAlerte.innerHTML = "";
+  }
+}
+
+// --------------------------------------------------------------------------
+// Import des lignes de factures scannees par l'app "Scan Facture", via le
+// stockage local du navigateur partage entre les deux apps (meme domaine
+// gerar04577.github.io). Aucun reseau requis : lecture directe de la meme
+// cle localStorage que celle utilisee par Scan Facture.
+// --------------------------------------------------------------------------
+const CLE_HISTORIQUE_SCANFACTURE = "scanfacture:historique";
+
+function echapperHtmlBenefice(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function chargerHistoriqueScanFacture() {
+  try {
+    const raw = localStorage.getItem(CLE_HISTORIQUE_SCANFACTURE);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function toggleImportScanFacturePanel() {
+  const panel = document.getElementById("import-scanfacture-panel");
+  const estOuvert = panel.style.display !== "none";
+  if (estOuvert) {
+    panel.style.display = "none";
+    return;
+  }
+  panel.style.display = "block";
+  renderImportScanFacture();
+}
+
+function renderImportScanFacture() {
+  const contenu = document.getElementById("import-scanfacture-content");
+  const historique = chargerHistoriqueScanFacture().filter((h) => Array.isArray(h.items) && h.items.length > 0);
+
+  if (historique.length === 0) {
+    contenu.innerHTML = `<div class="empty-state">Aucune facture scannée avec des produits détectés pour l'instant. Utilisez d'abord l'app "Scan Facture" sur cet iPhone, puis revenez ici.</div>`;
+    return;
+  }
+
+  contenu.innerHTML = historique.slice(0, 10).map((h, indexFacture) => {
+    const fournisseur = echapperHtmlBenefice(h.final?.fournisseur || h.ocr?.fournisseur || "Fournisseur inconnu");
+    const dateStr = h.date ? new Date(h.date).toLocaleDateString("fr-BE") : "";
+    const lignesHtml = h.items.map((it, indexLigne) => {
+      const nomPrefill = echapperHtmlBenefice(it.description || "");
+      const coutPrefill = it.prixUnitaire != null ? Number(it.prixUnitaire).toFixed(2) : "";
+      const uidLigne = `import-${indexFacture}-${indexLigne}`;
+      return `
+        <div class="summary-card" style="flex-wrap:wrap;">
+          <div style="flex:1; min-width:100%;">
+            <input type="text" id="${uidLigne}-nom" value="${nomPrefill}" placeholder="Nom de l'ingrédient" style="margin-bottom:6px;">
+            <div class="row-split">
+              <select id="${uidLigne}-unite">
+                <option value="piece">pièce</option>
+                <option value="kg">kg</option>
+                <option value="l">litre</option>
+              </select>
+              <input type="number" step="0.01" min="0" id="${uidLigne}-cout" value="${coutPrefill}" placeholder="Coût/unité €">
+            </div>
+          </div>
+          <button type="button" class="secondary import-ligne-btn" data-uid="${uidLigne}" style="width:100%;margin-top:6px;">+ Ajouter cet ingrédient</button>
+        </div>`;
+    }).join("");
+
+    return `
+      <div class="ticket-title-row" style="margin-top:10px;">
+        <div class="ticket-title" style="font-size:14px;">${fournisseur} ${dateStr ? "— " + dateStr : ""}</div>
+      </div>
+      ${lignesHtml}`;
+  }).join("");
+
+  contenu.querySelectorAll(".import-ligne-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const uidLigne = btn.dataset.uid;
+      const nom = document.getElementById(`${uidLigne}-nom`).value.trim();
+      const unite = document.getElementById(`${uidLigne}-unite`).value;
+      const cout = parseFloat(document.getElementById(`${uidLigne}-cout`).value) || 0;
+      if (!nom) return;
+      const { ingredient, ancienCout, estNouveau } = mettreAJourOuAjouterIngredient(nom, unite, cout);
+      renderIngredientsList();
+      renderProductsList();
+      btn.textContent = estNouveau ? "Ajouté ✓" : "Coût mis à jour ✓";
+      btn.disabled = true;
+      const zoneAlerte = document.getElementById("import-scanfacture-impact");
+      if (!estNouveau && ancienCout !== cout) {
+        const impacts = produitsImpactesParIngredient(ingredient.id, ancienCout);
+        zoneAlerte.innerHTML = htmlAlerteImpactPrix(impacts);
+      }
+    });
+  });
+}
+
+// Cherche un ingredient existant par nom (insensible a la casse/espaces).
+// Si trouve : met a jour son cout (garde le meme id, donc les recettes restent
+// liees) et renvoie l'ancien cout pour permettre d'alerter sur l'impact prix.
+// Si absent : cree un nouvel ingredient, comme avant.
+// Normalise un nom pour comparaison : minuscules, accents retires, espaces
+// superflus reduits. Utile car les tickets de caisse sont souvent en
+// MAJUSCULES SANS ACCENTS (ex. "FRITES SURGELEES") alors que l'ingredient
+// existant peut avoir ete saisi avec accents ("Frites surgelées").
+function normaliserNomIngredient(nom) {
+  return nom
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // retire les accents
+    .trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function mettreAJourOuAjouterIngredient(nom, unite, cout) {
+  const list = loadIngredients();
+  const nomNormalise = normaliserNomIngredient(nom);
+  const existant = list.find((i) => normaliserNomIngredient(i.nom) === nomNormalise);
+  if (existant) {
+    const ancienCout = existant.coutParUnite;
+    existant.coutParUnite = cout;
+    existant.unite = unite;
+    saveIngredients(list);
+    return { ingredient: existant, ancienCout, estNouveau: false };
+  }
+  const nouvel = { id: uid(), nom: nom.trim(), unite, coutParUnite: cout };
+  list.push(nouvel);
+  saveIngredients(list);
+  return { ingredient: nouvel, ancienCout: null, estNouveau: true };
+}
+
+// Pour un ingredient donne, liste les produits dont la recette l'utilise,
+// avec leur marge AVANT (au cout donne en 2e argument) et APRES (cout actuel
+// de l'ingredient) — sert a alerter sur les produits dont la rentabilite
+// vient de changer suite a une nouvelle facture.
+function produitsImpactesParIngredient(ingredientId, ancienCoutParUnite) {
+  const produits = loadProducts();
+  const ingredients = loadIngredients();
+  return produits
+    .filter((p) => (p.recette || []).some((l) => l.ingredientId === ingredientId))
+    .map((p) => {
+      const ligneRecette = p.recette.find((l) => l.ingredientId === ingredientId);
+      const coutApres = coutMatiereUnitaire(p, ingredients);
+      const coutAvant = coutApres - ligneRecette.quantite * (ingredients.find(i => i.id === ingredientId).coutParUnite - ancienCoutParUnite);
+      return {
+        nom: p.nom,
+        prixVente: p.prixVente,
+        margeAvant: p.prixVente - coutAvant,
+        margeApres: p.prixVente - coutApres
+      };
+    });
+}
+
+// Construit le HTML d'alerte "prix a revoir" pour les produits impactes par
+// un changement de cout d'ingredient (affichee apres ajout/import d'une
+// facture qui modifie un cout deja connu).
+function htmlAlerteImpactPrix(produitsImpactes) {
+  if (produitsImpactes.length === 0) return "";
+  const lignes = produitsImpactes.map((p) => {
+    const variation = p.margeApres - p.margeAvant;
+    const couleur = variation < 0 ? "var(--rust)" : "var(--green)";
+    const signe = variation >= 0 ? "+" : "";
+    return `<div class="field-note">${echapperHtmlBenefice(p.nom)} — marge ${eur(p.margeAvant)} → ${eur(p.margeApres)} <span style="color:${couleur}">(${signe}${eur(variation)})</span></div>`;
+  }).join("");
+  return `
+    <div class="summary-card" style="border:1px solid var(--gold); background:var(--gold-soft);">
+      <div style="flex:1">
+        <div class="day">💡 Prix de vente à revoir ?</div>
+        <div class="field-note">Cet ingrédient est utilisé dans ${produitsImpactes.length} produit(s) de votre carte :</div>
+        ${lignes}
+      </div>
+    </div>`;
 }
 
 function renderProductsList() {
@@ -1397,11 +1626,13 @@ function renderProductsList() {
   el.innerHTML = products.map((p) => {
     const cout = coutMatiereUnitaire(p, ingredients);
     const marge = p.prixVente - cout; // marge TTC-coût, indicatif dans la liste
+    const margePct = p.prixVente > 0 ? (marge / p.prixVente) * 100 : 0;
+    const couleurMarge = marge <= 0 ? "var(--rust)" : "var(--ink)";
     return `
       <div class="summary-card">
         <div style="flex:1">
           <div class="day">${p.nom} <span class="field-note">(${TYPE_LABELS[p.type]})</span></div>
-          <div class="field-note">Vente ${eur(p.prixVente)} · Coût matière ${eur(cout)} · Marge indicative ${eur(marge)}</div>
+          <div class="field-note">Vente ${eur(p.prixVente)} · Coût matière ${eur(cout)} · Marge indicative <span style="color:${couleurMarge}">${eur(marge)} (${margePct.toFixed(0)}%)</span></div>
         </div>
         <div style="display:flex; gap:6px;">
           <button type="button" class="secondary prod-edit" data-id="${p.id}" style="width:auto;margin:0;padding:6px 10px;">Modifier</button>
@@ -1928,6 +2159,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("restore-btn").addEventListener("click", handleRestore);
 
   document.getElementById("ingredient-form").addEventListener("submit", handleAddIngredient);
+  document.getElementById("import-scanfacture-btn").addEventListener("click", toggleImportScanFacturePanel);
   document.getElementById("add-product-btn").addEventListener("click", () => openProductForm(null));
   document.getElementById("product-form").addEventListener("submit", handleSaveProduct);
   document.getElementById("product-form-cancel").addEventListener("click", closeProductForm);

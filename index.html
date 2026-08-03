@@ -167,7 +167,17 @@
         </div>
         <button type="submit" class="primary">Ajouter l'ingrédient</button>
         <div id="ingredient-saved-msg" style="display:none; text-align:center; color:var(--green); font-size:13px; margin-top:8px;">Ingrédient ajouté ✓</div>
+        <div id="ingredient-impact-alerte"></div>
       </form>
+
+      <div class="section-gap"></div>
+      <button type="button" id="import-scanfacture-btn" class="secondary">📷 Importer depuis Scan Facture</button>
+      <div id="import-scanfacture-panel" style="display:none;">
+        <div class="section-gap"></div>
+        <div id="import-scanfacture-content"></div>
+        <div id="import-scanfacture-impact"></div>
+      </div>
+
       <div class="section-gap"></div>
       <div id="ingredients-list"></div>
     </div>
@@ -262,6 +272,7 @@
 
   <!-- ================= ÉCRAN 4 : PARAMÈTRES ================= -->
   <section id="screen-settings" class="screen">
+    <button type="button" class="primary" data-help="mode-emploi" style="margin-bottom:14px;">📖 Mode d'emploi</button>
     <form id="settings-form" class="ticket">
       <div class="ticket-title-row">
         <div class="ticket-title">TVA — Repas</div>
